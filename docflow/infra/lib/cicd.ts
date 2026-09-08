@@ -7,6 +7,21 @@ export interface CicdStackProps extends StackProps {
   repo: string;
   /** Ramas desde las que se permite desplegar. */
   ramas: string[];
+  /**
+   * Entornos de GitHub desde los que se permite desplegar.
+   *
+   * Esto NO es redundante con `ramas`, y es la trampa más fina de toda la
+   * configuración de OIDC: en cuanto un job declara `environment: X`, GitHub
+   * **cambia la forma del claim `sub`** del token que emite. Deja de ser
+   * `repo:owner/repo:ref:refs/heads/main` y pasa a ser
+   * `repo:owner/repo:environment:X`.
+   *
+   * Si la política de confianza solo contempla la forma con `ref:`, la
+   * asunción del rol falla con un "Not authorized to perform sts:AssumeRoleWithWebIdentity"
+   * que no dice ni una palabra sobre entornos — y manda a revisar el secreto,
+   * que está perfectamente bien.
+   */
+  entornos: string[];
 }
 
 /**
@@ -53,9 +68,13 @@ export class CicdStack extends Stack {
       assumedBy: new iam.WebIdentityPrincipal(proveedor.openIdConnectProviderArn, {
         StringEquals: { 'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com' },
         StringLike: {
-          'token.actions.githubusercontent.com:sub': props.ramas.map(
-            (rama) => `repo:${props.repo}:ref:refs/heads/${rama}`,
-          ),
+          // Las dos formas del claim: por rama y por entorno. Siempre acotadas
+          // a ESTE repositorio — nunca `repo:*`, que abriría la cuenta a
+          // cualquier repositorio de GitHub del mundo.
+          'token.actions.githubusercontent.com:sub': [
+            ...props.ramas.map((rama) => `repo:${props.repo}:ref:refs/heads/${rama}`),
+            ...props.entornos.map((entorno) => `repo:${props.repo}:environment:${entorno}`),
+          ],
         },
       }),
     });

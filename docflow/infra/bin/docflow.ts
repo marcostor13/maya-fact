@@ -36,6 +36,7 @@ new CicdStack(app, 'DocFlow-Cicd', {
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region },
   repo: app.node.tryGetContext('repo') ?? 'marcostor13/maya-fact',
   ramas: ['main'],
+  entornos: ['produccion'],
 });
 
 new DocFlowStack(app, 'DocFlow-Dev', {
