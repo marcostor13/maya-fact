@@ -59,47 +59,22 @@ jobs:
       - name: Tests del motor de reglas
         run: node --test --experimental-strip-types services/test/*.test.ts
 
-      # `cdk synth` es el equivalente a compilar la infraestructura: detecta
-      # referencias rotas y propiedades inválidas antes de tocar la cuenta.
+      # CLAUDE.md §2.9: bloqueante. Las librerias de parseo de PDF e imagen son
+      # historicamente el peor barrio del ecosistema, y este sistema las tocara.
+      - name: Vulnerabilidades en dependencias
+        run: npm audit --audit-level=high
+
+      # `cdk synth` va ANTES de la auditoria a proposito: la auditoria
+      # inspecciona la PLANTILLA SINTETIZADA, no el codigo fuente. Un grep sobre
+      # CDK comprueba lo que quisiste escribir; la plantilla, lo que sale.
       - name: Sintetizar la infraestructura
         working-directory: docflow/infra
         run: npx cdk synth --quiet
 
-      # Verificación de la promesa de borrado: ningún recurso puede quedarse
-      # atrás al destruir el stack. Si alguien añade un bucket o un log group
-      # sin política de borrado, esto falla AQUÍ y no seis meses después
-      # descubriendo que hay recursos huérfanos cobrando.
-      - name: Comprobar que todo el stack es eliminable
-        working-directory: docflow/infra
-        run: |
-          node -e '
-            const t = require("./cdk.out/DocFlow-Dev.template.json");
-            const retenidos = Object.entries(t.Resources).filter(([, r]) =>
-              (r.DeletionPolicy ?? "Delete") !== "Delete" ||
-              (r.UpdateReplacePolicy ?? "Delete") !== "Delete");
-            if (retenidos.length) {
-              console.error("Recursos que quedarian atras al destruir el stack:");
-              for (const [n, r] of retenidos) console.error("  " + r.Type + "  " + n);
-              process.exit(1);
-            }
-            console.log("OK: " + Object.keys(t.Resources).length + " recursos, 0 retenidos");
-          '
-
-      # El tenant NUNCA puede salir del request: tiene que venir del token
-      # firmado. Es una regla auditable mecánicamente, así que se audita.
-      - name: Comprobar que el tenant no viaja en el request
-        run: |
-          # Se excluyen las lineas de comentario: `auth-context.ts` menciona el
-          # antipatron a proposito para advertir de el, y un guard que no
-          # distingue codigo de documentacion acaba desactivandose por ruidoso.
-          HALLAZGOS=$(grep -rnE "pathParameters[?]?\.[A-Za-z]*[Tt]enant|queryStringParameters[?]?\.[A-Za-z]*[Tt]enant" services/src/ \
-                      | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(\*|//|/\*)' || true)
-          if [ -n "$HALLAZGOS" ]; then
-            echo "$HALLAZGOS"
-            echo "El tenant_id debe salir SIEMPRE del token, nunca del request."
-            exit 1
-          fi
-          echo "OK: el tenant solo se lee del token"
+      # CLAUDE.md §1 y §6: los 12 invariantes, mas la promesa de eliminabilidad.
+      # El script falla si no puede comprobar algo: no aprueba lo que no ha visto.
+      - name: Auditoria de seguridad (CLAUDE.md)
+        run: ./scripts/auditoria-seguridad.sh
 
   # ─────────────────────────────────────────────────────────────────────
   desplegar:

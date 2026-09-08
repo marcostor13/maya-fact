@@ -161,6 +161,8 @@ export class Pipeline extends Construct {
         'key.$': '$.key',
         'route.$': '$.classification.route',
         'detectedMime.$': '$.classification.detectedMime',
+        // Necesario para el tope de tokens de entrada (CLAUDE.md §2.5).
+        'pageCount.$': '$.classification.pageCount',
       }),
     });
 
@@ -247,6 +249,7 @@ export class Pipeline extends Construct {
         'key.$': '$.key',
         route: 'R3_TEXTRACT',
         'detectedMime.$': '$.classification.detectedMime',
+        'pageCount.$': '$.classification.pageCount',
         'ocr.$': '$.ocrFinal.resultado',
       }),
     });

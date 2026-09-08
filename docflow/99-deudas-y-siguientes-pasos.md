@@ -13,7 +13,9 @@ tiene. Estos son los que faltan, con su razón:
 | Ausencia | Dónde se prometía | Por qué no está |
 |---|---|---|
 | **GuardDuty Malware Protection for S3** | ADR-009, `seguridad.md` | Activación de consola con coste por GB. Meterlo a medias —activarlo sin consumir el evento de resultado— sería **peor que no tenerlo**: el diagrama diría que hay análisis y el pipeline procesaría igual los objetos infectados |
-| **Bedrock Guardrails** (filtro de *prompt attacks*, enmascarado de PII) | `seguridad.md` §3, capa 5 | Las otras cuatro capas están implementadas y son las estructurales. Guardrails es defensa en profundidad, no el control principal |
+| **Bedrock Guardrails** (filtro de *prompt attacks*, enmascarado de PII) | `seguridad.md` §3 · **`CLAUDE.md` §2.5** | Las otras cuatro capas están implementadas y son las estructurales. Guardrails es defensa en profundidad, no el control principal. **Es la única regla de `CLAUDE.md` que el código incumple hoy**, y está declarada como tal |
+| **CloudTrail** | `CLAUDE.md` §2.10 | Es configuración de cuenta, no del stack. Hay que verificarlo en la cuenta destino, no darlo por hecho |
+| **Cuotas por tenant** | `CLAUDE.md` §2.5, OWASP A04 | Hoy el *denial of wallet* lo acotan tres capas (rate limit de WAF, `maxConcurrency`, tope de tokens de entrada) pero **ninguna es por cliente**: un tenant puede consumir el presupuesto de todos |
 | ~~OIDC entre CI y AWS~~ | OWASP A08 | ✅ **Implementado**: `infra/lib/cicd.ts` + `.github/workflows/ci-cd.yml` |
 | **SBOM y escaneo de dependencias** | OWASP A06 | Sigue pendiente. El pipeline ya existe, así que ahora es añadir un paso |
 | **Inferencia por lotes al 50%** | `costos.md`, palanca 5 | Exige separar cola urgente de diferida: es una rama de arquitectura, no un flag |

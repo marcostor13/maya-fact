@@ -21,6 +21,22 @@ const s3 = new S3Client({});
 const MODEL_ID = required('MODEL_ID');
 const TOOL_NAME = 'registrar_factura';
 
+/**
+ * Tope de tokens de ENTRADA por documento (CLAUDE.md §2.5).
+ *
+ * `maxTokens` acota lo que el modelo escribe; esto acota lo que lee, que es lo
+ * que el atacante controla. Sin este tope, un documento de texto denso es un
+ * ataque de agotamiento económico contra la factura de Bedrock, y ni el límite
+ * de 20 MB ni el de 50 páginas lo cierran: un PDF de 50 páginas de texto corrido
+ * pesa poco y consume muchísimo.
+ *
+ * Es a la vez control de coste y de disponibilidad, y por eso el documento no
+ * falla: cae a revisión humana, que es el camino lento pero correcto.
+ */
+const MAX_TOKENS_ENTRADA = 60_000;
+const CARACTERES_POR_TOKEN = 4;      // aproximación habitual para texto latino
+const TOKENS_POR_PAGINA_IMAGEN = 1_500;  // página A4 a 150 DPI
+
 export interface ExtractInput {
   tenantId: string;
   documentId: string;
@@ -28,11 +44,23 @@ export interface ExtractInput {
   key: string;
   route: Route;
   detectedMime: string;
+  /** Del clasificador: necesario para estimar el coste de las rutas visuales. */
+  pageCount?: number;
   /** Presente solo en la ruta R3: el texto y la geometría que devolvió Textract. */
   ocr?: OcrResultado;
 }
 
 export const handler = async (input: ExtractInput): Promise<ExtractionResult> => {
+  const estimado = estimarTokensEntrada(input);
+  if (estimado > MAX_TOKENS_ENTRADA) {
+    // PermanentError: reintentarlo costaría lo mismo y volvería a exceder.
+    // Step Functions lo captura y lo manda a revisión humana.
+    throw new PermanentError(
+      `El documento excede el tope de entrada (${estimado} tokens estimados, máximo ${MAX_TOKENS_ENTRADA})`,
+      'ENTRADA_DEMASIADO_GRANDE',
+    );
+  }
+
   const content = await buildContent(input);
 
   const messages: Message[] = [{ role: 'user', content }];
@@ -156,6 +184,18 @@ async function buildContent(input: ExtractInput): Promise<ContentBlock[]> {
     default:
       throw new PermanentError(`Ruta ${input.route} no procesable automáticamente`, 'RUTA_MANUAL');
   }
+}
+
+/**
+ * Estimación deliberadamente conservadora: es un control de gasto, no una
+ * medición. Prefiere sobreestimar y mandar a revisión antes que dejar pasar un
+ * documento que dispare la factura.
+ */
+function estimarTokensEntrada(input: ExtractInput): number {
+  if (input.route === 'R3_TEXTRACT') {
+    return Math.ceil((input.ocr?.texto.length ?? 0) / CARACTERES_POR_TOKEN);
+  }
+  return (input.pageCount ?? 1) * TOKENS_POR_PAGINA_IMAGEN;
 }
 
 async function fetchBytes(bucket: string, key: string): Promise<Uint8Array> {

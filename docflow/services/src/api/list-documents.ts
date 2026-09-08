@@ -17,7 +17,30 @@ export const handler = async (
   if (!VALID.has(status)) return fail(400, 'STATUS_INVALIDO');
 
   const limit = Math.min(Number(event.queryStringParameters?.limit ?? 25), 100);
+
+  /**
+   * El cursor es entrada de un tercero y se decodifica DENTRO de un try/catch
+   * (CLAUDE.md §2.2).
+   *
+   * Sin él, un cursor manipulado —`?cursor=xxx`— hace que `JSON.parse` lance,
+   * la Lambda termine en error no capturado y API Gateway devuelva un 500. Ese
+   * 500 es un regalo para quien esté sondeando: confirma que el parámetro se
+   * deserializa en el servidor, y en cuanto alguien active un handler de error
+   * más hablador, empieza a filtrar la estructura de las claves de DynamoDB.
+   *
+   * Un dato de entrada malformado es un 400, nunca un 500: el 500 dice «me has
+   * roto», el 400 dice «eso no es válido». Solo uno de los dos invita a seguir.
+   */
+  let inicio: Record<string, unknown> | undefined;
   const cursor = event.queryStringParameters?.cursor;
+  if (cursor) {
+    try {
+      inicio = JSON.parse(Buffer.from(cursor, 'base64url').toString());
+      if (!inicio || typeof inicio !== 'object' || Array.isArray(inicio)) throw new Error('forma');
+    } catch {
+      return fail(400, 'CURSOR_INVALIDO');
+    }
+  }
 
   const res = await ddb.send(
     new QueryCommand({
@@ -27,7 +50,7 @@ export const handler = async (
       ExpressionAttributeValues: { ':pk': keys.gsi1pk(caller.tenantId, status) },
       ScanIndexForward: false, // más recientes primero
       Limit: limit,
-      ExclusiveStartKey: cursor ? JSON.parse(Buffer.from(cursor, 'base64url').toString()) : undefined,
+      ExclusiveStartKey: inicio,
     }),
   );
 
