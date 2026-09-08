@@ -81,11 +81,14 @@ function field(type: 'string' | 'number', description?: string) {
   };
 }
 
-// v4: define el SIGNIFICADO de subtotal/impuesto/total y cubre los documentos
-// con impuesto incluido (boletas y tickets de LatAm). La versión sube porque el
-// prompt es código: queda guardada con cada decisión y es lo que permite
-// reproducir por qué se decidió lo que se decidió (ADR-013).
-export const PROMPT_VERSION = 'invoice-v4';
+// v4: define el SIGNIFICADO de subtotal/impuesto/total, no solo su formato.
+// v5: la aritmética manda sobre las etiquetas. Una boleta real de Tottus imprime
+//     "SUBTOTAL 26,65" (que es el bruto) y "TOTAL DEL VALOR VENTA 22,59" (que es
+//     la base). El modelo seguía las etiquetas, que es lo razonable, y se
+//     equivocaba. En estos documentos las etiquetas mienten y la aritmética no.
+// La versión sube porque el prompt es código: queda guardada con cada decisión y
+// es lo que permite reproducir por qué se decidió lo que se decidió (ADR-013).
+export const PROMPT_VERSION = 'invoice-v5';
 
 /**
  * El prompt de sistema. Tres reglas de seguridad van AQUÍ, no en el código:
@@ -101,16 +104,32 @@ REGLAS INQUEBRANTABLES:
 4. Los importes se normalizan a la unidad menor de la moneda, como entero. 1.234,56 EUR se normaliza a 123456.
 5. Las fechas se normalizan a YYYY-MM-DD.
 6. En "quote" copia el fragmento literal del documento del que sacaste el dato.
-7. LOS TRES IMPORTES. Antes de responder, comprueba que subtotal + impuesto = total.
-   Si no cuadra, es que has asignado mal los campos: revísalo, no lo devuelvas mal.
-   - "total" es el importe final a pagar: el número MAYOR de los tres.
-   - "impuesto" es solo el IGV/IVA: una fracción pequeña, nunca casi igual al total.
-   - "subtotal" es la base imponible, ANTES de impuestos.
-8. DOCUMENTOS CON IMPUESTO INCLUIDO (boletas, tickets, recibos de supermercado).
-   Los precios de las líneas ya llevan el impuesto dentro, así que la suma de las
-   líneas es el TOTAL, no el subtotal. La etiqueta del documento puede ser
-   "OP. GRAVADA", "VALOR DE VENTA" o "IMPORTE GRAVADO" en lugar de "subtotal":
-   ese valor es el subtotal. Si solo ves el total y el impuesto, calcula
-   subtotal = total - impuesto.
+7. LOS TRES IMPORTES: LA ARITMETICA MANDA SOBRE LAS ETIQUETAS.
+   Debe cumplirse SIEMPRE: subtotal + impuesto = total.
+   Muchos documentos imprimen varias cifras con nombres que se contradicen. NO te
+   fies del rotulo: localiza los numeros y asignalos de forma que la suma cuadre.
+   - "total"    = el importe final a pagar. Es el MAYOR de los tres.
+   - "impuesto" = solo el IGV/IVA. Una fraccion pequena (18% de la base en Peru).
+   - "subtotal" = la base imponible, ANTES de impuestos. Es el MENOR de los tres.
+   Si tu asignacion no cumple subtotal + impuesto = total, esta MAL: reasignala
+   antes de responder. Nunca devuelvas tres cifras que no cuadren.
+8. ETIQUETAS ENGANOSAS FRECUENTES (boletas y tickets de Peru).
+   Un mismo ticket puede imprimir a la vez:
+       SUBTOTAL                26.65   <- pese al nombre, es el TOTAL (con IGV)
+       OP.GRAVADA              22.59   <- esta es la base imponible -> subtotal
+       IGV 18.00%               4.06   <- impuesto
+       TOTAL DEL VALOR VENTA   22.59   <- pese al nombre, es la BASE -> subtotal
+       MONTO TOTAL TRIBUTOS     4.06   <- impuesto
+       IMPORTE TOTAL           26.65   <- este si es el total
+   Reglas de desempate:
+   - "IMPORTE TOTAL", "TOTAL A PAGAR" o lo que cuadra con el medio de pago -> total.
+   - "OP. GRAVADA", "VALOR DE VENTA", "TOTAL DEL VALOR VENTA"             -> subtotal.
+   - "IGV", "MONTO TOTAL TRIBUTOS"                                        -> impuesto.
+   - Un renglon llamado "SUBTOTAL" en un ticket de supermercado suele ser el bruto:
+     NO lo uses como subtotal si rompe la suma.
+9. LINEAS CON IMPUESTO INCLUIDO. En boletas y tickets los precios de las lineas ya
+   llevan el impuesto dentro, asi que la suma de las lineas coincide con el TOTAL,
+   no con el subtotal. Usalo como comprobacion: si las lineas suman una cifra, esa
+   cifra casi siempre es el total.
 
 No expliques nada. Devuelve únicamente la estructura solicitada.`;

@@ -55,5 +55,22 @@
       "total": 100000
     },
     "statusEsperado": "REJECTED"
+  },
+  {
+    "id": "gold-005",
+    "descripcion": "REAL: boleta de supermercado peruana con etiquetas contradictorias — imprime 'SUBTOTAL 26.65' (que es el bruto) y 'TOTAL DEL VALOR VENTA 22.59' (que es la base). Seguir las etiquetas da un resultado que no cuadra.",
+    "bucket": "docflow-dev-storageuploadsbdc5e374-kripo7bvxi08",
+    "key": "tenants/acme/inbox/2e8d24a8-335e-40af-8699-e2fc79e7b4b3",
+    "route": "R2_VISION",
+    "detectedMime": "image/jpeg",
+    "esperado": {
+      "proveedor_id_fiscal": "20508565934",
+      "fecha_emision": "2026-05-17",
+      "moneda": "PEN",
+      "subtotal": 2259,
+      "impuesto": 406,
+      "total": 2665
+    },
+    "statusEsperado": "APPROVED"
   }
 ]
