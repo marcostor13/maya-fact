@@ -149,10 +149,23 @@ jobs:
           print("=" * 60)
           PY
 
+      # El ARN del rol va LITERAL, no en un secreto. No es un descuido:
+      #
+      # Un ARN es un identificador, no una credencial. No sirve de nada sin un
+      # token firmado por GitHub para este repositorio, que es lo que la
+      # política de confianza exige. Guardarlo como secreto no añade seguridad
+      # —la seguridad está en la política— y sí añade un modo de fallo: si el
+      # valor se pega mal, con un espacio o con el prefijo "RoleArn = ", STS
+      # responde "Not authorized to perform sts:AssumeRoleWithWebIdentity", que
+      # es EXACTAMENTE el mismo error que si el rol te denegara. AWS no
+      # distingue "no existe" de "no te deja" para no permitir enumerar roles.
+      #
+      # Es decir: el secreto convertía un error de tipografía en un error que
+      # parece de permisos. Con el ARN a la vista, ese modo de fallo desaparece.
       - name: Credenciales de AWS vía OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::500645089903:role/maya-fact-github-deploy
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: gha-${{ github.run_id }}
 
