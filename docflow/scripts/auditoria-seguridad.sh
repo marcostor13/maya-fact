@@ -24,7 +24,7 @@ PLANTILLA="infra/cdk.out/DocFlow-Dev.template.json"
 FALLOS=0
 AVISOS=0
 EJECUTADAS=0
-TOTAL=13
+TOTAL=14
 
 # El interprete se resuelve UNA vez y se exige. En Git Bash existe `python`
 # pero no `python3`: la primera version de este script llamaba a `python3`,
@@ -228,6 +228,18 @@ m=[(v['Type'],k) for k,v in t['Resources'].items()
 print('\n'.join('%s  %s'%x for x in sorted(m)))" "$PLANTILLA")
   [ -z "$H" ] && ok "EXTRA todo el stack se puede destruir sin residuos" \
                || falla "EXTRA quedarian recursos huerfanos al destruir" "$H"
+fi
+
+# ── Extra · los scripts tienen que poder ejecutarse ────────────────
+# Windows no guarda el bit de ejecucion, asi que un .sh nuevo entra al indice
+# como 100644 y el runner de Linux falla con exit code 126, que no menciona los
+# permisos. Ya paso dos veces: la segunda es la que convierte un descuido en un
+# guard. Se arregla con:  git update-index --chmod=+x scripts/<fichero>.sh
+if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+  H=$(git ls-files -s scripts/*.sh 2>/dev/null | grep "^100644" | awk '{print $4}' || true)
+  [ -z "$H" ] && ok "EXTRA todos los scripts son ejecutables en el indice de git"                || falla "EXTRA hay scripts sin bit de ejecucion (exit 126 en Linux)" "$H"
+else
+  avisa "EXTRA sin git: no puedo comprobar el bit de ejecucion" ""
 fi
 
 # ── Resumen ────────────────────────────────────────────────────────
