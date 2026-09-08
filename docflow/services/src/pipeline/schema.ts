@@ -13,9 +13,31 @@ export const INVOICE_SCHEMA = {
     numero_documento: field('string'),
     fecha_emision: field('string', 'Fecha en formato ISO 8601 (YYYY-MM-DD)'),
     moneda: field('string', 'Código ISO 4217, por ejemplo PEN, USD, EUR'),
-    subtotal: field('number', 'Importe en la unidad menor de la moneda (céntimos)'),
-    impuesto: field('number', 'Importe en la unidad menor de la moneda (céntimos)'),
-    total: field('number', 'Importe en la unidad menor de la moneda (céntimos)'),
+    // Las tres descripciones eran IDÉNTICAS y hablaban solo de formato. El
+    // modelo no tenía forma de saber qué distingue un subtotal de un total, así
+    // que en una boleta peruana —donde pone "OP. GRAVADA" y no "subtotal", y
+    // los precios ya incluyen IGV— mapeó los tres campos mal y la regla de
+    // coherencia aritmética rechazó una factura perfectamente válida.
+    // Un esquema que define el FORMATO pero no el SIGNIFICADO no es un contrato.
+    subtotal: field(
+      'number',
+      'BASE IMPONIBLE en la unidad menor de la moneda (céntimos): el importe ANTES de impuestos. ' +
+        'En documentos de Perú aparece como "OP. GRAVADA", "VALOR DE VENTA" o "SUBTOTAL". ' +
+        'Debe cumplirse siempre: subtotal + impuesto = total.',
+    ),
+    impuesto: field(
+      'number',
+      'IMPUESTO en céntimos (IGV, IVA, VAT). Es SIEMPRE una fracción pequeña del total, ' +
+        'típicamente el 18% de la base imponible en Perú. Si un candidato a impuesto es casi ' +
+        'igual al total, NO es el impuesto: te has equivocado de campo.',
+    ),
+    total: field(
+      'number',
+      'IMPORTE FINAL A PAGAR en céntimos, impuestos incluidos. Es el número MÁS GRANDE de los ' +
+        'tres y el que suele aparecer destacado como "TOTAL" o "IMPORTE TOTAL". Cuando los ' +
+        'precios de las líneas ya incluyen impuesto (habitual en boletas y tickets), la suma ' +
+        'de las líneas coincide con el TOTAL, no con el subtotal.',
+    ),
     lineas: {
       type: 'array',
       items: {
@@ -59,7 +81,11 @@ function field(type: 'string' | 'number', description?: string) {
   };
 }
 
-export const PROMPT_VERSION = 'invoice-v3';
+// v4: define el SIGNIFICADO de subtotal/impuesto/total y cubre los documentos
+// con impuesto incluido (boletas y tickets de LatAm). La versión sube porque el
+// prompt es código: queda guardada con cada decisión y es lo que permite
+// reproducir por qué se decidió lo que se decidió (ADR-013).
+export const PROMPT_VERSION = 'invoice-v4';
 
 /**
  * El prompt de sistema. Tres reglas de seguridad van AQUÍ, no en el código:
@@ -75,5 +101,16 @@ REGLAS INQUEBRANTABLES:
 4. Los importes se normalizan a la unidad menor de la moneda, como entero. 1.234,56 EUR se normaliza a 123456.
 5. Las fechas se normalizan a YYYY-MM-DD.
 6. En "quote" copia el fragmento literal del documento del que sacaste el dato.
+7. LOS TRES IMPORTES. Antes de responder, comprueba que subtotal + impuesto = total.
+   Si no cuadra, es que has asignado mal los campos: revísalo, no lo devuelvas mal.
+   - "total" es el importe final a pagar: el número MAYOR de los tres.
+   - "impuesto" es solo el IGV/IVA: una fracción pequeña, nunca casi igual al total.
+   - "subtotal" es la base imponible, ANTES de impuestos.
+8. DOCUMENTOS CON IMPUESTO INCLUIDO (boletas, tickets, recibos de supermercado).
+   Los precios de las líneas ya llevan el impuesto dentro, así que la suma de las
+   líneas es el TOTAL, no el subtotal. La etiqueta del documento puede ser
+   "OP. GRAVADA", "VALOR DE VENTA" o "IMPORTE GRAVADO" en lugar de "subtotal":
+   ese valor es el subtotal. Si solo ves el total y el impuesto, calcula
+   subtotal = total - impuesto.
 
 No expliques nada. Devuelve únicamente la estructura solicitada.`;
