@@ -35,6 +35,8 @@ const region: string = app.node.tryGetContext('region') ?? process.env.DOCFLOW_R
 new CicdStack(app, 'DocFlow-Cicd', {
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region },
   repo: app.node.tryGetContext('repo') ?? 'marcostor13/maya-fact',
+  // Los ids numericos salen de: gh api repos/<owner>/<repo> --jq '{id, owner: .owner.id}'
+  repoInmutable: app.node.tryGetContext('repoInmutable') ?? 'marcostor13@29555756/maya-fact@1361588720',
   ramas: ['main'],
   entornos: ['produccion'],
 });

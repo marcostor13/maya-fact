@@ -5,6 +5,29 @@ import { Construct } from 'constructs';
 export interface CicdStackProps extends StackProps {
   /** `usuario/repositorio` en GitHub. */
   repo: string;
+  /**
+   * La MISMA identidad, con los identificadores numéricos: `usuario@<id>/repo@<id>`.
+   *
+   * GitHub emite el claim `sub` en dos formatos, y cuál te toca no lo eliges tú:
+   *
+   *   repo:marcostor13/maya-fact:environment:produccion                 (clásico)
+   *   repo:marcostor13@29555756/maya-fact@1361588720:environment:produccion  (inmutable)
+   *
+   * El segundo existe por una buena razón de seguridad: si renombras el
+   * repositorio o cambias de usuario, el nombre queda libre y otra persona
+   * podría registrarlo. Con el nombre a secas, esa persona heredaría tu
+   * confianza en IAM. Con los ids numéricos —que no se reciclan— no.
+   *
+   * Se declaran AMBOS formatos porque el despliegue no puede depender de en qué
+   * fase del despliegue de esa funcionalidad esté GitHub ese día.
+   *
+   * Y no vale resolverlo poniendo un comodín tras el nombre del propietario:
+   * `marcostor13` seguido de comodín casaría también con un usuario llamado
+   * `marcostor13evil`, que podría registrarse hoy mismo. Los comodines en la
+   * parte del propietario son exactamente la clase de atajo que convierte una
+   * política de confianza en un agujero.
+   */
+  repoInmutable?: string;
   /** Ramas desde las que se permite desplegar. */
   ramas: string[];
   /**
@@ -71,24 +94,14 @@ export class CicdStack extends Stack {
           // Las dos formas del claim: por rama y por entorno. Siempre acotadas
           // a ESTE repositorio — nunca `repo:*`, que abriría la cuenta a
           // cualquier repositorio de GitHub del mundo.
-          'token.actions.githubusercontent.com:sub': [
-            ...props.ramas.map((rama) => `repo:${props.repo}:ref:refs/heads/${rama}`),
-            ...props.entornos.map((entorno) => `repo:${props.repo}:environment:${entorno}`),
-            // TEMPORAL — a estrechar en cuanto el paso de diagnóstico del
-            // workflow revele el `sub` exacto que envía GitHub.
-            //
-            // Sigue acotado a ESTE repositorio: un token de cualquier otro
-            // repositorio de GitHub no vale. Lo que se relaja es la parte
-            // final (rama / entorno / pull request), que mientras tanto la
-            // gobierna el propio workflow con
-            // `if: github.ref == 'refs/heads/main'`.
-            //
-            // El riesgo real que abre es acotado: GitHub NO concede permiso de
-            // `id-token: write` a los workflows de pull requests desde forks,
-            // así que solo alcanza a quien ya tiene permiso de escritura en el
-            // repositorio — que puede fusionar a main de todos modos.
-            `repo:${props.repo}:*`,
-          ],
+          // Sin comodines: cada valor es literal. La lista es el producto de
+          // {formatos de identidad} x {ramas y entornos permitidos}.
+          'token.actions.githubusercontent.com:sub': [props.repo, props.repoInmutable]
+            .filter((r): r is string => Boolean(r))
+            .flatMap((r) => [
+              ...props.ramas.map((rama) => `repo:${r}:ref:refs/heads/${rama}`),
+              ...props.entornos.map((entorno) => `repo:${r}:environment:${entorno}`),
+            ]),
         },
       }),
     });
