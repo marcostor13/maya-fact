@@ -92,7 +92,24 @@
 .campo { display: flex; flex-direction: column; gap: 6px; }
 .campo__etiqueta { font-size: 13px; font-weight: 550; color: var(--gris-70); }
 
-input[type='email'], input[type='password'] {
+// El campo con botón dentro: la caja posiciona, el input deja hueco a la
+// derecha para que el texto nunca pase por debajo del icono.
+.campo__caja { position: relative; display: block; }
+
+.ojo {
+  position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+  display: grid; place-items: center;
+  width: 38px; height: 38px;
+  padding: 0; border: 0; border-radius: 7px;
+  background: transparent; color: var(--gris-50);
+  cursor: pointer;
+  transition: color .15s, background .15s;
+
+  &:hover { color: var(--rojo); background: var(--rojo-claro); }
+  &:focus-visible { outline: 2px solid var(--rojo); outline-offset: 1px; }
+}
+
+input[type='email'], input[type='password'], input[type='text'] {
   width: 100%;
   padding: 11px 13px;
   font-size: 15px; font-family: inherit; color: var(--tinta);
@@ -102,6 +119,9 @@ input[type='email'], input[type='password'] {
   transition: border-color .15s, box-shadow .15s;
 
   &::placeholder { color: var(--gris-50); }
+  // Hueco para el botón del ojo. Se aplica solo dentro de .campo__caja para no
+  // desalinear los campos que no lo llevan.
+  .campo__caja & { padding-right: 46px; }
   &:focus {
     outline: none;
     border-color: var(--rojo);

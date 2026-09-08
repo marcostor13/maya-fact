@@ -38,6 +38,7 @@ export class App {
 
   email = signal('');
   password = signal('');
+  verPassword = signal(false);
   autenticado = signal(false);
   entrando = signal(false);
   error = signal('');
@@ -85,6 +86,7 @@ export class App {
   async salir(): Promise<void> {
     await this.auth.salir();
     this.autenticado.set(false);
+    this.verPassword.set(false);
     this.documentos.set([]);
     this.progreso.set('');
     this.ultimoEstado.set('');

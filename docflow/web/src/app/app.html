@@ -19,8 +19,21 @@
 
         <label class="campo">
           <span class="campo__etiqueta">Contraseña</span>
-          <input type="password" required autocomplete="current-password" placeholder="••••••••••••"
-                 [ngModel]="password()" (ngModelChange)="password.set($event)" name="password" />
+          <span class="campo__caja">
+            <input [type]="verPassword() ? 'text' : 'password'" required
+                   autocomplete="current-password" placeholder="••••••••••••"
+                   [ngModel]="password()" (ngModelChange)="password.set($event)" name="password" />
+            <!--
+              type="button" NO es opcional: dentro de un <form>, un botón sin
+              tipo explícito es de envío, así que pulsar el ojo intentaría
+              iniciar sesión con la contraseña a medio escribir.
+            -->
+            <button type="button" class="ojo" (click)="verPassword.set(!verPassword())"
+                    [attr.aria-label]="verPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                    [attr.aria-pressed]="verPassword()">
+              <mf-icono [nombre]="verPassword() ? 'ojo-tachado' : 'ojo'" [tamano]="18" />
+            </button>
+          </span>
         </label>
 
         @if (error()) {

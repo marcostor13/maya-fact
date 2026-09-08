@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 export type NombreIcono =
   | 'subir' | 'aprobado' | 'revision' | 'rechazado' | 'duplicado' | 'cuarentena'
-  | 'pendiente' | 'salir' | 'documento' | 'escudo' | 'candado' | 'refrescar';
+  | 'pendiente' | 'salir' | 'documento' | 'escudo' | 'candado' | 'refrescar'
+  | 'ojo' | 'ojo-tachado';
 
 /**
  * Iconos en SVG en línea, dentro de la plantilla.
@@ -73,6 +74,16 @@ export type NombreIcono =
         @case ('candado') {
           <rect x="3" y="11" width="18" height="11" rx="2" />
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        }
+        @case ('ojo') {
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+          <circle cx="12" cy="12" r="3" />
+        }
+        @case ('ojo-tachado') {
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-8-10-8a18.45 18.45 0 0 1 5.06-5.94" />
+          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19" />
+          <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+          <path d="M1 1l22 22" />
         }
         @case ('refrescar') {
           <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
