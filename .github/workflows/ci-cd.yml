@@ -126,6 +126,29 @@ jobs:
       # Credenciales temporales de una hora. Cero claves estáticas guardadas en
       # el repositorio: el secreto es el ARN de un rol, que no sirve de nada sin
       # un token firmado por GitHub para ESTE repositorio y ESTA rama.
+      # Diagnóstico: imprime los claims PÚBLICOS del token que emite GitHub.
+      # Nunca el token — solo `sub`, `aud`, `repository`, `ref` y `environment`,
+      # que son precisamente los valores contra los que la política de confianza
+      # de IAM compara. Cuando AssumeRoleWithWebIdentity falla, el error de AWS
+      # no dice QUÉ claim no cuadró; esto sí.
+      - name: Diagnóstico de los claims OIDC
+        env:
+          AUD: sts.amazonaws.com
+        run: |
+          RESPUESTA=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+                      "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUD}")
+          export JWT=$(printf '%s' "$RESPUESTA" | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])")
+          python3 - <<'PY'
+          import base64, json, os
+          carga = os.environ["JWT"].split(".")[1]
+          carga += "=" * (-len(carga) % 4)
+          c = json.loads(base64.urlsafe_b64decode(carga))
+          print("=" * 60)
+          for k in ("sub", "aud", "repository", "repository_owner", "ref", "environment", "workflow"):
+              print(f"  {k:18s}: {c.get(k)}")
+          print("=" * 60)
+          PY
+
       - name: Credenciales de AWS vía OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:

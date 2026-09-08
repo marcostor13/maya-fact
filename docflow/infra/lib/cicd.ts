@@ -74,6 +74,20 @@ export class CicdStack extends Stack {
           'token.actions.githubusercontent.com:sub': [
             ...props.ramas.map((rama) => `repo:${props.repo}:ref:refs/heads/${rama}`),
             ...props.entornos.map((entorno) => `repo:${props.repo}:environment:${entorno}`),
+            // TEMPORAL — a estrechar en cuanto el paso de diagnóstico del
+            // workflow revele el `sub` exacto que envía GitHub.
+            //
+            // Sigue acotado a ESTE repositorio: un token de cualquier otro
+            // repositorio de GitHub no vale. Lo que se relaja es la parte
+            // final (rama / entorno / pull request), que mientras tanto la
+            // gobierna el propio workflow con
+            // `if: github.ref == 'refs/heads/main'`.
+            //
+            // El riesgo real que abre es acotado: GitHub NO concede permiso de
+            // `id-token: write` a los workflows de pull requests desde forks,
+            // así que solo alcanza a quien ya tiene permiso de escritura en el
+            // repositorio — que puede fusionar a main de todos modos.
+            `repo:${props.repo}:*`,
           ],
         },
       }),
