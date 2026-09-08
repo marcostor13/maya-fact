@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Maya Fact">
+  <!--
+    La marca cuenta el producto en un vistazo: un documento validado.
+    Tres elementos, ni uno más — a 16 px (favicon) todo lo demás sería ruido.
+  -->
+  <defs>
+    <linearGradient id="mf-rojo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E8283F"/>
+      <stop offset="100%" stop-color="#B01729"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="48" height="48" rx="12" fill="url(#mf-rojo)"/>
+
+  <!-- La hoja, con la esquina doblada -->
+  <path d="M16 10h11l7 7v20a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2z" fill="#FFFFFF"/>
+  <path d="M27 10l7 7h-7z" fill="#FBC3C9"/>
+
+  <!-- La validación: lo que de verdad vende el producto -->
+  <path d="M19.5 27.5l3.6 3.6 6.9-8" fill="none" stroke="#D91E36" stroke-width="2.8"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,151 @@
+@if (!autenticado()) {
+  <!-- ── Acceso ─────────────────────────────────────────────────────── -->
+  <div class="acceso">
+    <div class="acceso__panel">
+      <div class="marca marca--grande">
+        <img src="logo.svg" alt="" width="52" height="52" />
+        <div class="marca__texto">
+          <span class="marca__nombre">Maya<span>Fact</span></span>
+          <span class="marca__lema">Facturas validadas automáticamente</span>
+        </div>
+      </div>
+
+      <form class="formulario" (submit)="entrar(); $event.preventDefault()">
+        <label class="campo">
+          <span class="campo__etiqueta">Correo electrónico</span>
+          <input type="email" required autocomplete="username" placeholder="tu@empresa.com"
+                 [ngModel]="email()" (ngModelChange)="email.set($event)" name="email" />
+        </label>
+
+        <label class="campo">
+          <span class="campo__etiqueta">Contraseña</span>
+          <input type="password" required autocomplete="current-password" placeholder="••••••••••••"
+                 [ngModel]="password()" (ngModelChange)="password.set($event)" name="password" />
+        </label>
+
+        @if (error()) {
+          <p class="aviso aviso--error">
+            <mf-icono nombre="rechazado" [tamano]="16" />{{ error() }}
+          </p>
+        }
+
+        <button class="boton boton--principal boton--ancho" type="submit" [disabled]="entrando()">
+          @if (entrando()) { <span class="girador"></span> Entrando… }
+          @else { <mf-icono nombre="candado" [tamano]="17" /> Entrar }
+        </button>
+      </form>
+
+      <p class="acceso__pie">
+        <mf-icono nombre="escudo" [tamano]="14" />
+        Tus documentos se cifran en reposo y nunca salen de tu organización
+      </p>
+    </div>
+  </div>
+} @else {
+  <!-- ── Aplicación ─────────────────────────────────────────────────── -->
+  <header class="cabecera">
+    <div class="cabecera__interior">
+      <div class="marca">
+        <img src="logo.svg" alt="" width="34" height="34" />
+        <span class="marca__nombre">Maya<span>Fact</span></span>
+      </div>
+      <button class="boton boton--fantasma" (click)="salir()" aria-label="Cerrar sesión">
+        <mf-icono nombre="salir" [tamano]="17" />
+        <span class="solo-escritorio">Salir</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="contenido">
+    <!-- Subida -->
+    <section class="tarjeta">
+      <h2 class="tarjeta__titulo"><mf-icono nombre="subir" [tamano]="19" /> Subir factura</h2>
+
+      <label class="soltar" [class.soltar--activo]="arrastrando()" [class.soltar--ocupado]="subiendo()"
+             (dragover)="alArrastrar($event, true)"
+             (dragleave)="alArrastrar($event, false)"
+             (drop)="alSoltar($event)">
+        <input type="file" accept="application/pdf,image/jpeg,image/png,image/tiff"
+               [disabled]="subiendo()" (change)="alSeleccionar($event)" hidden />
+
+        @if (subiendo()) {
+          <span class="girador girador--grande"></span>
+          <span class="soltar__titulo">{{ progreso() || 'Procesando…' }}</span>
+          <span class="soltar__nota">Normalmente tarda menos de un minuto</span>
+        } @else {
+          <span class="soltar__icono"><mf-icono nombre="documento" [tamano]="26" /></span>
+          <span class="soltar__titulo">Arrastra tu factura aquí</span>
+          <span class="soltar__nota">o pulsa para elegir · PDF, JPG, PNG o TIFF · hasta 20 MB</span>
+        }
+      </label>
+
+      @if (ultimoEstado()) {
+        <p class="aviso aviso--ok">
+          <mf-icono [nombre]="icono(ultimoEstado())" [tamano]="16" />
+          Documento procesado: <strong>{{ etiqueta(ultimoEstado()) }}</strong>
+        </p>
+      }
+
+      <p class="tarjeta__pie">
+        <mf-icono nombre="escudo" [tamano]="14" />
+        El archivo viaja <strong>directo al almacenamiento</strong> con un permiso firmado: nunca pasa por nuestra API.
+      </p>
+    </section>
+
+    <!-- Listado -->
+    <section class="tarjeta">
+      <div class="tarjeta__encabezado">
+        <h2 class="tarjeta__titulo"><mf-icono nombre="documento" [tamano]="19" /> Documentos</h2>
+        <button class="boton boton--fantasma boton--pequeno" (click)="listar()" [disabled]="cargando()"
+                aria-label="Actualizar lista">
+          <mf-icono nombre="refrescar" [tamano]="15" />
+          <span class="solo-escritorio">Actualizar</span>
+        </button>
+      </div>
+
+      <div class="pestanas" role="tablist">
+        @for (f of filtros; track f.valor) {
+          <button role="tab" class="pestana" [class.pestana--activa]="filtro() === f.valor"
+                  [attr.aria-selected]="filtro() === f.valor" (click)="cambiarFiltro(f.valor)">
+            {{ f.texto }}
+          </button>
+        }
+      </div>
+
+      @if (cargando()) {
+        <div class="vacio"><span class="girador girador--grande"></span></div>
+      } @else if (documentos().length === 0) {
+        <div class="vacio">
+          <mf-icono nombre="documento" [tamano]="30" />
+          <p>No hay documentos en «{{ filtroTexto() }}»</p>
+        </div>
+      } @else {
+        <table class="tabla">
+          <thead>
+            <tr><th>Documento</th><th>Estado</th><th>Ruta</th><th>Actualizado</th></tr>
+          </thead>
+          <tbody>
+            @for (d of documentos(); track d.documentId) {
+              <tr>
+                <td data-etiqueta="Documento">
+                  <span class="doc">
+                    <mf-icono nombre="documento" [tamano]="16" />
+                    <span class="doc__nombre">{{ nombreCorto(d) }}</span>
+                  </span>
+                </td>
+                <td data-etiqueta="Estado">
+                  <span class="pastilla" [attr.data-estado]="d.status">
+                    <mf-icono [nombre]="icono(d.status)" [tamano]="13" />
+                    {{ etiqueta(d.status) }}
+                  </span>
+                </td>
+                <td data-etiqueta="Ruta"><code>{{ d.route || '—' }}</code></td>
+                <td data-etiqueta="Actualizado">{{ fecha(d.updatedAt) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+  </main>
+}

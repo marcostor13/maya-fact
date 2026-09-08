@@ -1,0 +1,8 @@
+node_modules/
+cdk.out/
+dist/
+*.tsbuildinfo
+.env
+web/.build/
+docflow/web/.build/
+docflow.tar.gz

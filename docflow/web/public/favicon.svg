@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Misma marca, engordada para que siga leyendose a 16 px en una pestana. -->
+  <defs>
+    <linearGradient id="fv" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E8283F"/>
+      <stop offset="100%" stop-color="#B01729"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="11" fill="url(#fv)"/>
+  <path d="M15 9h12l7 7v21a2 2 0 0 1-2 2H15a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z" fill="#FFFFFF"/>
+  <path d="M27 9l7 7h-7z" fill="#FBC3C9"/>
+  <path d="M18.5 27l4 4 7.5-8.6" fill="none" stroke="#D91E36" stroke-width="3.6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

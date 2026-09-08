@@ -1,0 +1,12 @@
+{
+  "name": "docflow",
+  "private": true,
+  "workspaces": ["infra", "services"],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "synth": "npm run synth -w infra",
+    "deploy": "npm run deploy -w infra",
+    "destroy": "npm run destroy -w infra",
+    "eval": "node --experimental-strip-types evals/run-evals.ts"
+  }
+}

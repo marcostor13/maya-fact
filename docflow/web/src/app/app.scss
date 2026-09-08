@@ -1,0 +1,344 @@
+// ─────────────────────────────────────────────────────────────────────────
+//  Maya Fact — rojo y blanco
+//
+//  El rojo es el color de la marca, no el de los errores. Por eso los estados
+//  de error usan un rojo MÁS OSCURO y saturado que el de marca, y el aprobado
+//  usa verde: si el rojo significara a la vez "nosotros" y "algo va mal", la
+//  interfaz dejaría de comunicar de un vistazo, que es justo su trabajo.
+// ─────────────────────────────────────────────────────────────────────────
+
+:host {
+  --rojo:        #d91e36;
+  --rojo-oscuro: #b01729;
+  --rojo-claro:  #fef2f3;
+  --rojo-borde:  #f8d4d9;
+
+  --tinta:   #12161d;
+  --gris-70: #5b6472;
+  --gris-50: #8b95a3;
+  --gris-20: #e5e9ef;
+  --gris-10: #f2f5f8;
+  --blanco:  #ffffff;
+  --fondo:   #f6f8fb;
+
+  --verde:   #0f8a4f;
+  --verde-bg:#e9f7ef;
+  --ambar:   #a56a00;
+  --ambar-bg:#fdf3e2;
+  --azul:    #1560b0;
+  --azul-bg: #e8f1fc;
+
+  --r-s: 9px;
+  --r-m: 14px;
+  --r-l: 20px;
+  --sombra:    0 1px 2px rgba(16, 24, 40, .05), 0 1px 3px rgba(16, 24, 40, .06);
+  --sombra-md: 0 4px 6px -2px rgba(16, 24, 40, .04), 0 12px 22px -4px rgba(16, 24, 40, .10);
+
+  display: block;
+  min-height: 100dvh;
+  background: var(--fondo);
+  color: var(--tinta);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+
+// ── Marca ───────────────────────────────────────────────────────────────
+.marca {
+  display: flex; align-items: center; gap: 11px;
+  img { border-radius: 10px; flex: none; }
+}
+.marca__texto { display: flex; flex-direction: column; gap: 2px; }
+.marca__nombre {
+  font-size: 19px; font-weight: 700; letter-spacing: -.025em; color: var(--tinta);
+  span { color: var(--rojo); }
+}
+.marca__lema { font-size: 13px; color: var(--gris-50); font-weight: 400; }
+.marca--grande {
+  margin-bottom: 26px;
+  .marca__nombre { font-size: 25px; }
+  img { border-radius: 14px; }
+}
+
+// ── Acceso ──────────────────────────────────────────────────────────────
+.acceso {
+  min-height: 100dvh;
+  display: grid; place-items: center;
+  padding: 24px 18px;
+  // Un halo rojo muy tenue: da identidad sin gritar.
+  background:
+    radial-gradient(1100px 460px at 50% -8%, rgba(217, 30, 54, .10), transparent 62%),
+    var(--fondo);
+}
+.acceso__panel {
+  width: 100%; max-width: 412px;
+  background: var(--blanco);
+  border: 1px solid var(--gris-20);
+  border-radius: var(--r-l);
+  box-shadow: var(--sombra-md);
+  padding: 34px 30px 26px;
+}
+.acceso__pie {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  margin: 22px 0 0; padding-top: 18px;
+  border-top: 1px solid var(--gris-20);
+  font-size: 12.5px; color: var(--gris-50); text-align: center;
+  mf-icono { color: var(--verde); flex: none; }
+}
+
+// ── Formulario ──────────────────────────────────────────────────────────
+.formulario { display: flex; flex-direction: column; gap: 15px; }
+.campo { display: flex; flex-direction: column; gap: 6px; }
+.campo__etiqueta { font-size: 13px; font-weight: 550; color: var(--gris-70); }
+
+input[type='email'], input[type='password'] {
+  width: 100%;
+  padding: 11px 13px;
+  font-size: 15px; font-family: inherit; color: var(--tinta);
+  background: var(--blanco);
+  border: 1px solid var(--gris-20);
+  border-radius: var(--r-s);
+  transition: border-color .15s, box-shadow .15s;
+
+  &::placeholder { color: var(--gris-50); }
+  &:focus {
+    outline: none;
+    border-color: var(--rojo);
+    box-shadow: 0 0 0 3px rgba(217, 30, 54, .13);
+  }
+}
+
+// ── Botones ─────────────────────────────────────────────────────────────
+.boton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 17px;
+  font: inherit; font-size: 14.5px; font-weight: 550;
+  border: 1px solid transparent; border-radius: var(--r-s);
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .06s;
+
+  &:active:not(:disabled) { transform: translateY(1px); }
+  &:disabled { opacity: .6; cursor: not-allowed; }
+  &:focus-visible { outline: 2px solid var(--rojo); outline-offset: 2px; }
+}
+.boton--principal {
+  background: var(--rojo); color: var(--blanco);
+  box-shadow: 0 1px 2px rgba(176, 23, 41, .28);
+  &:hover:not(:disabled) { background: var(--rojo-oscuro); }
+}
+.boton--fantasma {
+  background: transparent; color: var(--gris-70); border-color: var(--gris-20);
+  &:hover:not(:disabled) { background: var(--gris-10); color: var(--tinta); }
+}
+.boton--ancho { width: 100%; padding: 12px; }
+.boton--pequeno { padding: 7px 12px; font-size: 13.5px; }
+
+// ── Cabecera ────────────────────────────────────────────────────────────
+.cabecera {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(255, 255, 255, .88);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--gris-20);
+}
+.cabecera__interior {
+  max-width: 940px; margin: 0 auto;
+  padding: 13px 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+
+.contenido {
+  max-width: 940px; margin: 0 auto;
+  padding: 26px 20px 60px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+
+// ── Tarjetas ────────────────────────────────────────────────────────────
+.tarjeta {
+  background: var(--blanco);
+  border: 1px solid var(--gris-20);
+  border-radius: var(--r-m);
+  box-shadow: var(--sombra);
+  padding: 22px;
+}
+.tarjeta__encabezado {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 16px;
+  .tarjeta__titulo { margin-bottom: 0; }
+}
+.tarjeta__titulo {
+  display: flex; align-items: center; gap: 9px;
+  margin: 0 0 16px; font-size: 16.5px; font-weight: 650; letter-spacing: -.015em;
+  mf-icono { color: var(--rojo); }
+}
+.tarjeta__pie {
+  display: flex; align-items: flex-start; gap: 7px;
+  margin: 15px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--gris-50);
+  mf-icono { color: var(--verde); flex: none; margin-top: 1px; }
+  strong { color: var(--gris-70); font-weight: 600; }
+}
+
+// ── Zona de subida ──────────────────────────────────────────────────────
+.soltar {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 9px; text-align: center;
+  min-height: 168px; padding: 26px 18px;
+  border: 1.5px dashed var(--gris-20);
+  border-radius: var(--r-m);
+  background: var(--gris-10);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+
+  &:hover:not(.soltar--ocupado) { border-color: var(--rojo); background: var(--rojo-claro); }
+  &--activo { border-color: var(--rojo); background: var(--rojo-claro); border-style: solid; }
+  &--ocupado { cursor: progress; }
+}
+.soltar__icono {
+  display: grid; place-items: center;
+  width: 50px; height: 50px; margin-bottom: 2px;
+  border-radius: 50%;
+  background: var(--rojo-claro); color: var(--rojo);
+  border: 1px solid var(--rojo-borde);
+}
+.soltar__titulo { font-size: 15px; font-weight: 600; }
+.soltar__nota { font-size: 12.5px; color: var(--gris-50); }
+
+// ── Avisos ──────────────────────────────────────────────────────────────
+.aviso {
+  display: flex; align-items: center; gap: 8px;
+  margin: 14px 0 0; padding: 10px 13px;
+  font-size: 13.5px; border-radius: var(--r-s); border: 1px solid transparent;
+  mf-icono { flex: none; }
+}
+.aviso--error { background: var(--rojo-claro); border-color: var(--rojo-borde); color: var(--rojo-oscuro); }
+.aviso--ok    { background: var(--verde-bg); border-color: #c3e8d3; color: var(--verde); }
+
+// ── Pestañas de filtro ──────────────────────────────────────────────────
+.pestanas {
+  display: flex; gap: 6px; margin-bottom: 16px;
+  overflow-x: auto; scrollbar-width: none;
+  padding-bottom: 2px;
+  &::-webkit-scrollbar { display: none; }
+}
+.pestana {
+  flex: none;
+  padding: 7px 14px;
+  font: inherit; font-size: 13.5px; font-weight: 550; color: var(--gris-70);
+  background: var(--gris-10); border: 1px solid transparent; border-radius: 999px;
+  cursor: pointer; white-space: nowrap;
+  transition: background .15s, color .15s;
+  &:hover { background: var(--gris-20); }
+  &--activa {
+    background: var(--rojo); color: var(--blanco);
+    &:hover { background: var(--rojo-oscuro); }
+  }
+  &:focus-visible { outline: 2px solid var(--rojo); outline-offset: 2px; }
+}
+
+// ── Tabla ───────────────────────────────────────────────────────────────
+.tabla {
+  width: 100%; border-collapse: collapse; font-size: 14px;
+
+  th {
+    text-align: left; padding: 9px 10px;
+    font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--gris-50); border-bottom: 1px solid var(--gris-20);
+  }
+  td { padding: 12px 10px; border-bottom: 1px solid var(--gris-10); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr { transition: background .12s; }
+  tbody tr:hover { background: var(--gris-10); }
+
+  code {
+    font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--gris-70); background: var(--gris-10);
+    padding: 2px 6px; border-radius: 5px;
+  }
+}
+.doc { display: flex; align-items: center; gap: 8px; mf-icono { color: var(--gris-50); flex: none; } }
+.doc__nombre { font-weight: 550; overflow-wrap: anywhere; }
+
+.pastilla {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  background: var(--gris-10); color: var(--gris-70);
+
+  &[data-estado='APPROVED']    { background: var(--verde-bg); color: var(--verde); }
+  &[data-estado='NEEDS_REVIEW']{ background: var(--ambar-bg); color: var(--ambar); }
+  &[data-estado='REJECTED'],
+  &[data-estado='QUARANTINED'] { background: var(--rojo-claro); color: var(--rojo-oscuro); }
+  &[data-estado='DUPLICATE']   { background: var(--azul-bg); color: var(--azul); }
+}
+
+.vacio {
+  display: flex; flex-direction: column; align-items: center; gap: 11px;
+  padding: 46px 20px; color: var(--gris-50); text-align: center;
+  p { margin: 0; font-size: 14px; }
+  mf-icono { opacity: .45; }
+}
+
+// ── Girador ─────────────────────────────────────────────────────────────
+.girador {
+  width: 15px; height: 15px; flex: none;
+  border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%;
+  animation: girar .65s linear infinite;
+  &--grande { width: 26px; height: 26px; border-width: 2.5px; color: var(--rojo); }
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+// ── Móvil ───────────────────────────────────────────────────────────────
+// La tabla no se puede desplazar horizontalmente en un móvil sin que la lectura
+// se vuelva un suplicio: cada fila pasa a ser una tarjeta, y la cabecera de
+// columna se convierte en la etiqueta de cada dato (`data-etiqueta`).
+@media (max-width: 640px) {
+  .solo-escritorio { display: none; }
+
+  .contenido { padding: 18px 14px 48px; gap: 16px; }
+  .cabecera__interior { padding: 11px 14px; }
+  .tarjeta { padding: 18px 16px; border-radius: var(--r-m); }
+  .acceso__panel { padding: 28px 22px 22px; }
+
+  .boton { min-height: 44px; }   // objetivo táctil cómodo
+  .pestana { min-height: 38px; }
+
+  .tabla {
+    thead { display: none; }
+    tbody, tr, td { display: block; }
+
+    tr {
+      padding: 13px 14px; margin-bottom: 10px;
+      border: 1px solid var(--gris-20); border-radius: var(--r-m);
+      background: var(--blanco);
+      &:hover { background: var(--blanco); }
+    }
+    tbody tr:last-child { margin-bottom: 0; }
+
+    td {
+      display: flex; align-items: center; justify-content: space-between; gap: 14px;
+      padding: 5px 0; border: 0;
+
+      &::before {
+        content: attr(data-etiqueta);
+        font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+        color: var(--gris-50); flex: none;
+      }
+      // El nombre del documento manda: ocupa su propia línea, arriba y en grande.
+      &[data-etiqueta='Documento'] {
+        display: block; padding-bottom: 9px; margin-bottom: 5px;
+        border-bottom: 1px solid var(--gris-10);
+        &::before { display: none; }
+      }
+    }
+  }
+}
+
+@media (max-width: 380px) {
+  .marca__nombre { font-size: 17px; }
+  .soltar { min-height: 148px; }
+}

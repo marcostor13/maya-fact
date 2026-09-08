@@ -1,0 +1,55 @@
+{
+  "tenantId": "acme",
+  "version": "2026-09-01.3",
+  "umbrales": {
+    "default": 0.75,
+    "total": 0.95,
+    "proveedor_id_fiscal": 0.9,
+    "numero_documento": 0.9
+  },
+  "camposCriticos": ["total", "proveedor_id_fiscal", "numero_documento", "fecha_emision"],
+  "reglas": [
+    {
+      "id": "R-001",
+      "descripcion": "Las líneas deben sumar el subtotal",
+      "severidad": "BLOCK",
+      "mensaje": "Las líneas no suman el subtotal declarado ({subtotal})",
+      "cuando": { "op": "sum_lineas_eq", "propiedad": "importe", "ref": "subtotal", "tolerancia": 2 }
+    },
+    {
+      "id": "R-002",
+      "descripcion": "Subtotal más impuesto debe igualar el total",
+      "severidad": "BLOCK",
+      "mensaje": "Subtotal + impuesto no cuadra con el total ({total})",
+      "cuando": { "op": "sum_eq", "campos": ["subtotal", "impuesto"], "ref": "total", "tolerancia": 2 }
+    },
+    {
+      "id": "R-003",
+      "descripcion": "El identificador fiscal debe tener forma válida",
+      "severidad": "BLOCK",
+      "mensaje": "Identificador fiscal con formato inválido",
+      "cuando": { "campo": "proveedor_id_fiscal", "op": "matches", "patron": "^(?!\\d{11}$).*$" }
+    },
+    {
+      "id": "R-014",
+      "descripcion": "El total no puede exceder el límite pactado con el proveedor",
+      "severidad": "BLOCK",
+      "mensaje": "Importe {total} supera el límite autorizado",
+      "cuando": { "campo": "total", "op": "gt", "valor": 5000000 }
+    },
+    {
+      "id": "R-020",
+      "descripcion": "Moneda fuera del catálogo permitido",
+      "severidad": "WARN",
+      "mensaje": "Moneda {moneda} requiere aprobación manual",
+      "cuando": { "campo": "moneda", "op": "matches", "patron": "^(?!(PEN|USD|EUR)$).*$" }
+    },
+    {
+      "id": "R-030",
+      "descripcion": "Falta la fecha de emisión",
+      "severidad": "WARN",
+      "mensaje": "El documento no declara fecha de emisión",
+      "cuando": { "campo": "fecha_emision", "op": "missing" }
+    }
+  ]
+}

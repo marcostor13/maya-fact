@@ -1,0 +1,16 @@
+# Normalización por defecto.
+* text=auto
+
+# Los scripts SIEMPRE con finales de línea LF, pase lo que pase.
+# Si un .sh llega a un runner de Linux con CRLF, bash falla con
+# "$'\r': command not found" — un error que no menciona los finales de línea y
+# manda a buscar el problema al sitio equivocado. Ya perdimos una tarde con la
+# variante de esto en jq; esta línea es el seguro.
+*.sh  text eol=lf
+*.yml text eol=lf
+
+# Binarios, sin tocar.
+*.svg text
+*.pdf binary
+*.png binary
+*.ico binary
