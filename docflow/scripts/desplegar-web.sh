@@ -38,6 +38,18 @@ if [ ! -d "$BUILD/node_modules" ]; then
 fi
 
 echo "==> 2/4 Copiando la aplicacion"
+
+# Guard: si falta un fichero, `ng new` deja el SUYO por defecto y la compilacion
+# sale bien. Eso ya paso una vez con app.config.ts: sin el, Angular usaba su
+# plantilla —sin interceptor— y todas las peticiones salian sin cabecera
+# Authorization. La API respondia 401 a todo y el frontend parecia correcto.
+#
+# Un fichero que falta y se sustituye por un valor por defecto plausible es peor
+# que un fichero que falta y rompe: el primero se descubre en produccion.
+for f in app.ts app.html app.scss app.config.ts auth.service.ts auth.interceptor.ts \
+         documents.service.ts icon.ts; do
+  [ -f "$RAIZ/web/src/app/$f" ] || { echo "FALTA web/src/app/$f — no compilo con el andamiaje por defecto"; exit 1; }
+done
 # Todo lo que define la aplicacion vive en el repositorio; el workspace generado
 # solo aporta el andamiaje de compilacion. Se sobrescribe la plantilla que crea
 # Angular por defecto, incluida `app.html`, que trae una pagina de bienvenida.
