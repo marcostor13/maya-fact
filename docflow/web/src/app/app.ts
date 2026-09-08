@@ -40,6 +40,8 @@ export class App {
   password = signal('');
   verPassword = signal(false);
   autenticado = signal(false);
+  /** Mientras se comprueba si ya hay sesión, no se enseña ninguna de las dos vistas. */
+  comprobandoSesion = signal(true);
   entrando = signal(false);
   error = signal('');
 
@@ -56,6 +58,30 @@ export class App {
   filtroTexto = computed(
     () => FILTROS.find((f) => f.valor === this.filtro())?.texto ?? '',
   );
+
+  constructor() {
+    void this.restaurarSesion();
+  }
+
+  /**
+   * Amplify guarda la sesión en el navegador y sobrevive a recargar la página.
+   * Sin esta comprobación al arrancar, alguien que ya estaba dentro veía el
+   * formulario de acceso — y al intentar entrar de nuevo se topaba con
+   * `UserAlreadyAuthenticatedException`. Restaurar la sesión no es una comodidad:
+   * es lo que hace que el estado de la aplicación coincida con la realidad.
+   */
+  private async restaurarSesion(): Promise<void> {
+    try {
+      const correo = await this.auth.sesionActiva();
+      if (correo) {
+        this.email.set(correo);
+        this.autenticado.set(true);
+        await this.listar();
+      }
+    } finally {
+      this.comprobandoSesion.set(false);
+    }
+  }
 
   icono(estado: string): NombreIcono {
     return ICONO_POR_ESTADO[estado] ?? 'documento';
@@ -76,6 +102,8 @@ export class App {
     } catch (e) {
       // Mensaje genérico y único: no distinguimos "el usuario no existe" de
       // "la contraseña es incorrecta". Distinguirlos permite enumerar cuentas.
+      // El mensaje al usuario es genérico a propósito: distinguir "no existe"
+      // de "contraseña incorrecta" permite enumerar cuentas. El detalle, al log.
       this.error.set('No se pudo iniciar sesión. Revisa tus credenciales.');
       console.error(e);
     } finally {

@@ -82,6 +82,29 @@ b.configurations.production.budgets = [
   { type: "initial", maximumWarning: "700kB", maximumError: "1MB" },
   { type: "anyComponentStyle", maximumWarning: "10kB", maximumError: "12kB" },
 ];
+
+// inlineCritical: false — y esto NO es una preferencia de rendimiento.
+//
+// Con la opcion activada (el valor por defecto), Angular emite la hoja de
+// estilos como:
+//     <link rel="stylesheet" href="..." media="print" onload="this.media=,all,">
+// Es un truco clasico para no bloquear el primer pintado. El problema es que
+// `onload=` es un manejador de eventos EN LINEA, y nuestra CSP declara
+// `script-src self`: el navegador lo bloquea, el `media` se queda en "print" y
+// **la hoja de estilos global no se aplica nunca**.
+//
+// El sintoma es silencioso: los estilos de componente viajan dentro del JS, asi
+// que la pagina se ve casi bien y solo falta lo global. La consola avisa con un
+// error de CSP que parece de seguridad y en realidad es de maquetacion.
+//
+// Se desactiva la optimizacion en vez de aniadir 'unsafe-hashes' a la CSP:
+// relajar la politica para que un truco de carga funcione seria pagar seguridad
+// real por unos milisegundos.
+b.configurations.production.optimization = {
+  scripts: true,
+  styles: { minify: true, inlineCritical: false },
+  fonts: true,
+};
 fs.writeFileSync(ruta, JSON.stringify(j, null, 2));
 ' "$BUILD/angular.json"
 

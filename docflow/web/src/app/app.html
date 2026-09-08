@@ -1,4 +1,9 @@
-@if (!autenticado()) {
+@if (comprobandoSesion()) {
+  <!-- ── Comprobando sesión ─────────────────────────────────────────── -->
+  <div class="acceso">
+    <span class="girador girador--grande"></span>
+  </div>
+} @else if (!autenticado()) {
   <!-- ── Acceso ─────────────────────────────────────────────────────── -->
   <div class="acceso">
     <div class="acceso__panel">
