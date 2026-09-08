@@ -145,8 +145,20 @@ CDK, que ya están acotados. Es la capa de indirección que la mayoría se salta
 cd infra && npx cdk deploy DocFlow-Cicd     # crea el proveedor OIDC y el rol
 ```
 
-Copia el `RoleArn` que imprime y guárdalo en GitHub como secreto
-**`AWS_DEPLOY_ROLE_ARN`** (Settings → Secrets and variables → Actions).
+El ARN queda escrito en el workflow. **No va en un secreto a propósito:** un ARN
+es un identificador, no una credencial — sin un token firmado por GitHub para
+este repositorio no sirve de nada. Guardarlo como secreto no añade seguridad y sí
+un modo de fallo, porque si el valor se pega mal STS responde *"Not authorized to
+perform sts:AssumeRoleWithWebIdentity"*, **el mismo error que si el rol denegara**.
+
+> **El detalle que costó cuatro intentos:** GitHub emite el claim `sub` en dos
+> formatos, y cuál te toca no lo eliges tú. El clásico
+> (`repo:usuario/repo:environment:X`) y el **inmutable**, con los identificadores
+> numéricos: `repo:usuario@29555756/repo@1361588720:environment:X`. El segundo
+> existe porque, si renombras el repositorio, el nombre queda libre y otra
+> persona podría registrarlo y heredar tu confianza en IAM. La política declara
+> **ambos formatos, con valores literales y sin comodines** — un comodín tras el
+> nombre del propietario casaría con `usuario-cualquier-cosa`.
 
 A partir de ahí, cada push a `main` despliega infraestructura y frontend, y
 termina comprobando que la SPA responde `200` y que `/api/documents` responde

@@ -288,7 +288,70 @@ veinte.
 
 ---
 
-## Caso 9 — Correcciones menores, todas verificables
+## Caso 9 — El claim que ningún error nombra
+
+**Contexto:** el job de despliegue fallaba con
+
+```
+Error: Could not assume role with OIDC:
+Not authorized to perform sts:AssumeRoleWithWebIdentity
+```
+
+**Qué propuso, y qué probé:** dos hipótesis razonables, las dos falsas.
+
+1. *"Un job con `environment:` recibe un `sub` distinto"* — cierto, y lo añadí. Siguió fallando.
+2. *"El ARN del secreto está mal pegado"* — plausible, porque **STS devuelve ese mismo error cuando el rol no existe**: no distingue "te deniega" de "no está", para no permitir enumerar roles. Puse el ARN literal. Siguió fallando.
+
+Entre medias probé un comodín sobre todo el repositorio (`repo:usuario/repo:*`)
+para descartar el `sub` por completo. **También falló** — y eso fue el dato que
+lo cambió todo: si un comodín sobre el repositorio no coincide, el problema no
+está en el sufijo.
+
+**Qué hice:** dejé de adivinar y **hice que el pipeline lo dijera**. Un paso que
+pide el token OIDC y decodifica sus claims públicos —`sub`, `aud`, `repository`,
+nunca el token— antes del paso que falla.
+
+La respuesta apareció a la primera:
+
+```
+sub : repo:marcostor13@29555756/maya-fact@1361588720:environment:produccion
+```
+
+GitHub emitía el **subject inmutable**, con los identificadores numéricos del
+propietario y del repositorio. Por eso ni el comodín valía: el valor ya diverge
+en `marcostor13@…`.
+
+**Por qué el formato existe, que es lo interesante:** si renombras el
+repositorio, el nombre queda libre y otra persona puede registrarlo — y heredaría
+tu confianza en IAM. Los ids numéricos no se reciclan. Es una defensa contra un
+ataque que yo no había considerado.
+
+**La lección, y es la misma tres veces hoy:** el error de AWS decía que no estaba
+autorizado, pero no *qué* claim no cuadraba. Tres intentos a ciegas costaron más
+que los diez minutos de escribir el paso que imprime el dato. **Cuando un sistema
+compara dos valores y solo te dice que no coinciden, el trabajo no es adivinar
+uno: es hacer que te enseñe los dos.**
+
+---
+
+## Caso 10 — Exit code 126
+
+Con el OIDC ya resuelto, el despliegue de la SPA falló con **exit code 126**.
+
+No es un fallo de la aplicación: 126 es *"encontrado pero no ejecutable"*.
+Windows no guarda el bit de ejecución, así que los `.sh` llegaron al índice de
+git como `100644` y el runner de Linux no podía ejecutarlos. Se corrige con
+`git update-index --chmod=+x`.
+
+Lo dejo anotado junto al caso del CRLF de `jq` y al de los finales de línea en
+`.gitattributes` porque los tres son el mismo problema: **desarrollar en Windows
+y desplegar en Linux tiene una superficie de incompatibilidad silenciosa** —
+permisos, finales de línea, mayúsculas en rutas— que no aparece en ninguna
+prueba local y siempre aparece en el primer despliegue.
+
+---
+
+## Caso 11 — Correcciones menores, todas verificables
 
 Las agrupo porque ninguna sostiene una conversación de cinco minutos, pero
 juntas dicen algo: **el código generado compila mucho antes de estar bien.**
