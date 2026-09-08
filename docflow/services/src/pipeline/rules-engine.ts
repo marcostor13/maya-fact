@@ -82,8 +82,12 @@ function evalExpr(expr: RuleExpr, hechos: Hechos): boolean {
     // aritmética: disparar aquí produciría un RECHAZO por un dato ausente.
     if (hechos.lineas.length === 0) return false;
     const suma = hechos.lineas.reduce((acc, l) => acc + (Number(l[expr.propiedad]) || 0), 0);
-    const objetivo = num(fields, expr.ref);
-    return Math.abs(suma - objetivo) > (expr.tolerancia ?? 0);
+    const referencias = expr.refs ?? (expr.ref ? [expr.ref] : []);
+    const tolerancia = expr.tolerancia ?? 0;
+    // Se dispara solo si la suma no cuadra con NINGUNA de las referencias:
+    // con precios sin impuesto cuadra con el subtotal, con impuesto incluido
+    // cuadra con el total. Ambos documentos son correctos.
+    return !referencias.some((r) => Math.abs(suma - num(fields, r)) <= tolerancia);
   }
 
   if (!('campo' in expr)) return false;

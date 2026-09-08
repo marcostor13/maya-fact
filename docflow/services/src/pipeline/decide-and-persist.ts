@@ -4,6 +4,7 @@ import { Metrics, MetricUnit } from '@aws-lambda-powertools/metrics';
 import { ddb, keys } from '../shared/ddb.js';
 import { required } from '../shared/env.js';
 import { evaluar } from './rules-engine.js';
+import { reconciliarImportes } from './reconciliar.js';
 import type { Decision, ExtractionResult, RuleSet } from '../shared/types.js';
 import ruleSetLocal from '../../../rules/acme-invoices.json';
 
@@ -33,7 +34,15 @@ type TxItem =
 
 export const handler = async (input: DecideInput): Promise<Decision> => {
   const ruleSet = await cargarRuleSet(input.tenantId);
-  const decision = evaluar(input.extraction, ruleSet);
+
+  // Reconciliación ANTES de las reglas: lo que se puede derivar se deriva, para
+  // que el motor juzgue datos coherentes en vez de errores de lectura. Los
+  // ajustes se registran: una corrección silenciosa no sería auditable.
+  const { fields, ajustes } = reconciliarImportes(input.extraction);
+  const extraccion = { ...input.extraction, fields };
+
+  const decision = evaluar(extraccion, ruleSet);
+  if (ajustes.length) logger.info('importes reconciliados', { documentId: input.documentId, ajustes });
 
   const now = new Date().toISOString();
 
@@ -51,7 +60,7 @@ export const handler = async (input: DecideInput): Promise<Decision> => {
         Key: { pk: keys.tenant(input.tenantId), sk: keys.doc(input.documentId) },
         UpdateExpression:
           'SET #st = :st, gsi1pk = :g1pk, gsi1sk = :g1sk, #rt = :rt, pageCount = :pc, sha256 = :sha,' +
-          ' hits = :hits, camposBajoUmbral = :cbu, lineas = :lineas,' +
+          ' hits = :hits, camposBajoUmbral = :cbu, lineas = :lineas, ajustes = :ajustes,' +
           ' modelId = :model, promptVersion = :pv, rulesetVersion = :rv,' +
           ' inputTokens = :ti, outputTokens = :to, updatedAt = :now' +
           ' REMOVE expiresAt',
@@ -65,7 +74,8 @@ export const handler = async (input: DecideInput): Promise<Decision> => {
           ':sha': input.sha256,
           ':hits': decision.hits,
           ':cbu': decision.camposBajoUmbral,
-          ':lineas': input.extraction.lineas ?? [],
+          ':lineas': extraccion.lineas ?? [],
+          ':ajustes': ajustes,
           // El trío que hace auditable cualquier decisión, para siempre.
           ':model': input.extraction.modelId,
           ':pv': input.extraction.promptVersion,
@@ -92,7 +102,7 @@ export const handler = async (input: DecideInput): Promise<Decision> => {
     },
   ];
 
-  for (const [name, f] of Object.entries(input.extraction.fields)) {
+  for (const [name, f] of Object.entries(extraccion.fields)) {
     items.push({
       Put: {
         TableName: TABLE,

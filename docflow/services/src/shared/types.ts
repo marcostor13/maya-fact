@@ -67,8 +67,16 @@ export type RuleExpr =
   | { campo: string; op: 'matches'; patron: string }
   /** Suma de campos escalares comparada con otro campo. subtotal + impuesto = total. */
   | { op: 'sum_eq'; campos: string[]; ref: string; tolerancia?: number }
-  /** Suma de una propiedad de las líneas comparada con un campo. lineas[].importe = subtotal. */
-  | { op: 'sum_lineas_eq'; propiedad: 'importe'; ref: string; tolerancia?: number }
+  /**
+   * Suma de una propiedad de las líneas comparada con uno o VARIOS campos.
+   *
+   * `refs` admite varios a propósito: si los precios de las líneas excluyen
+   * impuesto, suman el subtotal; si lo incluyen —boletas y tickets—, suman el
+   * total. Las dos son facturas correctas, así que la regla solo se dispara
+   * cuando la suma no coincide con NINGUNA. Exigir solo `subtotal` daba por
+   * universal un modelo de precios que no lo es.
+   */
+  | { op: 'sum_lineas_eq'; propiedad: 'importe'; ref?: string; refs?: string[]; tolerancia?: number }
   | { op: 'and' | 'or'; de: RuleExpr[] }
   | { op: 'not'; de: RuleExpr };
 
