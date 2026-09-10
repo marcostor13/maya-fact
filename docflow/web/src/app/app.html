@@ -140,7 +140,7 @@
       } @else {
         <table class="tabla">
           <thead>
-            <tr><th>Documento</th><th>Estado</th><th>Ruta</th><th>Actualizado</th></tr>
+            <tr><th>Documento</th><th>Estado</th><th>Ruta</th><th>Actualizado</th><th></th></tr>
           </thead>
           <tbody>
             @for (d of documentos(); track d.documentId) {
@@ -159,6 +159,13 @@
                 </td>
                 <td data-etiqueta="Ruta"><code>{{ d.route || '—' }}</code></td>
                 <td data-etiqueta="Actualizado">{{ fecha(d.updatedAt) }}</td>
+                <td data-etiqueta="Detalle" class="tabla__accion">
+                  <button class="boton boton--fantasma boton--pequeno" (click)="abrirDetalle(d.documentId)"
+                          [attr.aria-label]="'Ver el detalle de ' + nombreCorto(d)">
+                    <mf-icono nombre="ojo" [tamano]="15" />
+                    <span class="solo-escritorio">Ver</span>
+                  </button>
+                </td>
               </tr>
             }
           </tbody>
@@ -166,4 +173,175 @@
       }
     </section>
   </main>
+
+  <!-- ── Ficha del documento ──────────────────────────────────────────
+       Aquí vive la respuesta a «¿por qué está así?» y el documento original.
+       Las dos cosas juntas a propósito: un motivo que no se puede contrastar
+       contra el papel obliga a creerse al sistema. -->
+  @if (detalle() || cargandoDetalle()) {
+    <div class="panel" role="dialog" aria-modal="true" aria-labelledby="panel-titulo">
+      <div class="panel__fondo" (click)="cerrarDetalle()" aria-hidden="true"></div>
+
+      <div class="panel__caja">
+        @if (cargandoDetalle()) {
+          <div class="vacio"><span class="girador girador--grande"></span></div>
+        } @else if (detalle(); as d) {
+          <header class="panel__cabecera">
+            <div class="panel__titulo">
+              <h2 id="panel-titulo">{{ nombreCorto(d.document) }}</h2>
+              <span class="pastilla" [attr.data-estado]="d.document.status">
+                <mf-icono [nombre]="icono(d.document.status)" [tamano]="13" />
+                {{ etiqueta(d.document.status) }}
+              </span>
+            </div>
+            <button class="boton boton--fantasma boton--pequeno" (click)="cerrarDetalle()" aria-label="Cerrar">
+              <mf-icono nombre="cerrar" [tamano]="17" />
+            </button>
+          </header>
+
+          <div class="panel__cuerpo">
+            <!-- El porqué, en castellano y escrito por el pipeline -->
+            <div class="motivo" [attr.data-estado]="d.document.status">
+              <span class="motivo__icono">
+                <mf-icono [nombre]="icono(d.document.status)" [tamano]="19" />
+              </span>
+              <div class="motivo__texto">
+                <p class="motivo__resumen">
+                  {{ d.document.explicacion?.resumen || etiqueta(d.document.status) }}
+                </p>
+                @for (linea of d.document.explicacion?.detalles ?? []; track linea) {
+                  <p class="motivo__detalle">{{ linea }}</p>
+                }
+              </div>
+            </div>
+
+            <!-- «Duplicada» a secas no responde nada: la pregunta es de cuál -->
+            @if (d.original; as o) {
+              <div class="original">
+                <mf-icono nombre="enlace" [tamano]="16" />
+                <span class="original__texto">
+                  Mismo contenido que <strong>{{ o.fileName || o.documentId }}</strong>
+                  @if (o.status) {
+                    <span class="pastilla pastilla--mini" [attr.data-estado]="o.status">
+                      {{ etiqueta(o.status) }}
+                    </span>
+                  }
+                </span>
+                <button class="boton boton--fantasma boton--pequeno" (click)="irAlOriginal(o.documentId)">
+                  Abrir el original
+                </button>
+              </div>
+            }
+
+            <!-- Las reglas que saltaron, con su identificador: auditable -->
+            @if ((d.document.hits ?? []).length) {
+              <section class="bloque">
+                <h3 class="bloque__titulo">Comprobaciones que no pasaron</h3>
+                <ul class="reglas">
+                  @for (h of d.document.hits ?? []; track h.id) {
+                    <li class="regla" [attr.data-sev]="h.severidad">
+                      <span class="regla__id">{{ h.id }}</span>
+                      <span class="regla__texto">{{ h.mensaje }}</span>
+                    </li>
+                  }
+                </ul>
+              </section>
+            }
+
+            <!-- El documento original -->
+            <section class="bloque">
+              <div class="bloque__encabezado">
+                <h3 class="bloque__titulo">Documento original</h3>
+                <div class="acciones">
+                  @if (visor(); as v) {
+                    <a class="boton boton--fantasma boton--pequeno" [href]="v.url" [download]="v.fileName">
+                      <mf-icono nombre="descargar" [tamano]="15" />
+                      <span class="solo-escritorio">Descargar</span>
+                    </a>
+                    <button class="boton boton--fantasma boton--pequeno" (click)="cerrarVisor()">
+                      <mf-icono nombre="cerrar" [tamano]="15" />
+                      <span class="solo-escritorio">Ocultar</span>
+                    </button>
+                  } @else {
+                    <button class="boton boton--principal boton--pequeno"
+                            (click)="verDocumento()" [disabled]="cargandoVisor()">
+                      @if (cargandoVisor()) { <span class="girador"></span> Cargando… }
+                      @else { <mf-icono nombre="ojo" [tamano]="15" /> Ver documento }
+                    </button>
+                  }
+                </div>
+              </div>
+
+              @if (errorVisor()) {
+                <p class="aviso aviso--error">
+                  <mf-icono nombre="rechazado" [tamano]="16" />{{ errorVisor() }}
+                </p>
+              }
+
+              @if (visor(); as v) {
+                @switch (tipoVisor()) {
+                  @case ('pdf') {
+                    <!-- El src se asigna desde el componente: `iframe[src]` es
+                         contexto RESOURCE_URL en Angular y una interpolación
+                         exigiría bypassSecurityTrust*, que aquí está prohibido. -->
+                    <iframe #marco class="visor" title="Documento original"></iframe>
+                  }
+                  @case ('imagen') {
+                    <img class="visor visor--imagen" [src]="v.url" alt="Documento original" />
+                  }
+                  @default {
+                    <p class="visor__sin-vista">
+                      <mf-icono nombre="info" [tamano]="16" />
+                      Ningún navegador muestra este formato. Descárgalo para verlo.
+                    </p>
+                  }
+                }
+              } @else if (!cargandoVisor()) {
+                <p class="bloque__nota">
+                  <mf-icono nombre="escudo" [tamano]="14" />
+                  Se pide con un enlace firmado que caduca en dos minutos y no se guarda en ningún sitio.
+                </p>
+              }
+            </section>
+
+            <!-- Lo que se extrajo -->
+            @if (d.fields.length) {
+              <section class="bloque">
+                <h3 class="bloque__titulo">Datos extraídos</h3>
+                <ul class="campos">
+                  @for (c of d.fields; track c.nombre) {
+                    <li class="dato" [class.dato--dudoso]="esDudoso(c)">
+                      <span class="dato__nombre">{{ etiquetaCampo(c.nombre) }}</span>
+                      <span class="dato__valor">{{ valorCampo(c, monedaDe(d.fields)) }}</span>
+                      <span class="dato__meta">
+                        {{ porcentaje(c.confidence) }} · {{ procedencia(c.source) }}
+                      </span>
+                    </li>
+                  }
+                </ul>
+                @if (d.document.camposBajoUmbral?.length) {
+                  <p class="bloque__nota">
+                    <mf-icono nombre="revision" [tamano]="14" />
+                    Los campos marcados no alcanzaron el umbral de confianza de tu organización.
+                  </p>
+                }
+              </section>
+            }
+
+            <!-- El trío que permite reproducir esta decisión dentro de seis meses -->
+            <section class="bloque bloque--tenue">
+              <h3 class="bloque__titulo">Trazabilidad</h3>
+              <dl class="traza">
+                <div><dt>Ruta</dt><dd><code>{{ d.document.route || '—' }}</code></dd></div>
+                <div><dt>Modelo</dt><dd><code>{{ d.document.modelId || '—' }}</code></dd></div>
+                <div><dt>Prompt</dt><dd><code>{{ d.document.promptVersion || '—' }}</code></dd></div>
+                <div><dt>Reglas</dt><dd><code>{{ d.document.rulesetVersion || '—' }}</code></dd></div>
+                <div><dt>Actualizado</dt><dd>{{ fecha(d.document.updatedAt) }}</dd></div>
+              </dl>
+            </section>
+          </div>
+        }
+      </div>
+    </div>
+  }
 }

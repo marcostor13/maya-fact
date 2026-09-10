@@ -298,6 +298,198 @@ input[type='email'], input[type='password'], input[type='text'] {
   mf-icono { opacity: .45; }
 }
 
+// ── Ficha del documento ─────────────────────────────────────────────────
+//  Se abre encima y no debajo de la lista a propósito: el visor necesita alto,
+//  y empujar la tabla haría que la fila que acabas de pulsar se te escapara de
+//  la pantalla justo cuando quieres compararla con lo que estás leyendo.
+.panel {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.panel__fondo {
+  position: absolute; inset: 0;
+  background: rgba(18, 22, 29, .45);
+  backdrop-filter: blur(2px);
+}
+.panel__caja {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: 88dvh;
+  display: flex; flex-direction: column;
+  background: var(--blanco);
+  border: 1px solid var(--gris-20);
+  border-radius: var(--r-l);
+  box-shadow: var(--sombra-md);
+  overflow: hidden;
+}
+.panel__cabecera {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gris-20);
+  background: var(--blanco);
+}
+.panel__titulo {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  h2 {
+    margin: 0; font-size: 16.5px; font-weight: 650; letter-spacing: -.015em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+}
+.panel__cuerpo {
+  padding: 18px 20px 26px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 18px;
+}
+
+// ── El motivo ───────────────────────────────────────────────────────────
+//  Es lo primero y lo más grande de la ficha. Si alguien abre esto es porque
+//  quiere saber por qué, y hacerle buscar la respuesta sería cruel.
+.motivo {
+  display: flex; gap: 12px;
+  padding: 15px 16px;
+  border: 1px solid var(--gris-20);
+  border-radius: var(--r-m);
+  background: var(--gris-10);
+
+  &[data-estado='APPROVED']     { background: var(--verde-bg); border-color: #c3e8d3; }
+  &[data-estado='NEEDS_REVIEW'] { background: var(--ambar-bg); border-color: #f2ddb8; }
+  &[data-estado='REJECTED'],
+  &[data-estado='QUARANTINED']  { background: var(--rojo-claro); border-color: var(--rojo-borde); }
+  &[data-estado='DUPLICATE']    { background: var(--azul-bg);  border-color: #c9def7; }
+}
+.motivo__icono {
+  flex: none; margin-top: 1px;
+  .motivo[data-estado='APPROVED'] &     { color: var(--verde); }
+  .motivo[data-estado='NEEDS_REVIEW'] & { color: var(--ambar); }
+  .motivo[data-estado='REJECTED'] &,
+  .motivo[data-estado='QUARANTINED'] &  { color: var(--rojo-oscuro); }
+  .motivo[data-estado='DUPLICATE'] &    { color: var(--azul); }
+}
+.motivo__texto { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.motivo__resumen { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.45; }
+.motivo__detalle { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--gris-70); }
+
+// ── Enlace al original de un duplicado ──────────────────────────────────
+.original {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  padding: 12px 14px;
+  border: 1px dashed var(--gris-20); border-radius: var(--r-s);
+  font-size: 13.5px;
+  mf-icono { color: var(--azul); flex: none; }
+  strong { font-weight: 600; overflow-wrap: anywhere; }
+}
+.original__texto {
+  flex: 1 1 220px;
+  display: inline-flex; align-items: center; flex-wrap: wrap; gap: 7px;
+  color: var(--gris-70);
+}
+
+// ── Bloques de la ficha ─────────────────────────────────────────────────
+.bloque {
+  display: flex; flex-direction: column; gap: 10px;
+  &--tenue { opacity: .92; }
+}
+.bloque__encabezado {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap;
+}
+.bloque__titulo {
+  margin: 0; font-size: 12px; font-weight: 650; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--gris-50);
+}
+.bloque__nota {
+  display: flex; align-items: flex-start; gap: 7px;
+  margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--gris-50);
+  mf-icono { flex: none; margin-top: 1px; }
+}
+.acciones { display: flex; align-items: center; gap: 8px; }
+
+// El botón de descarga es un <a>: sin esto sale subrayado y desalineado.
+a.boton { text-decoration: none; }
+
+// ── Reglas disparadas ───────────────────────────────────────────────────
+//  El identificador va delante y en monoespaciada: es lo que se cita en una
+//  reclamación («se rechazó por R-002»), así que tiene que poder leerse y
+//  copiarse, no ser una nota al pie del mensaje.
+.reglas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.regla {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-s);
+  font-size: 13.5px; line-height: 1.5;
+  background: var(--gris-10);
+  border-left: 3px solid var(--gris-20);
+
+  &[data-sev='BLOCK'] { background: var(--rojo-claro); border-left-color: var(--rojo); }
+  &[data-sev='WARN']  { background: var(--ambar-bg);  border-left-color: var(--ambar); }
+}
+.regla__id {
+  flex: none;
+  font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600; color: var(--gris-70);
+  padding-top: 2px;
+}
+.regla__texto { overflow-wrap: anywhere; }
+
+// ── Visor ───────────────────────────────────────────────────────────────
+.visor {
+  width: 100%; height: 520px;
+  border: 1px solid var(--gris-20); border-radius: var(--r-s);
+  background: var(--gris-10);
+  &--imagen { height: auto; max-height: 520px; object-fit: contain; display: block; }
+}
+.visor__sin-vista {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0; padding: 20px; border-radius: var(--r-s);
+  background: var(--gris-10); color: var(--gris-70); font-size: 13.5px;
+  mf-icono { flex: none; }
+}
+
+// ── Datos extraídos ─────────────────────────────────────────────────────
+.campos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.dato {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(90px, auto) auto;
+  align-items: baseline; gap: 10px 14px;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--gris-10);
+  font-size: 13.5px;
+  &:last-child { border-bottom: 0; }
+
+  // La duda se marca en el campo, no en el documento: equivocarse en el nombre
+  // del proveedor y en el importe total no cuestan lo mismo.
+  &--dudoso {
+    background: var(--ambar-bg);
+    border-radius: var(--r-s);
+    box-shadow: inset 3px 0 0 var(--ambar);
+  }
+}
+.dato__nombre { color: var(--gris-70); }
+.dato__valor { font-weight: 600; overflow-wrap: anywhere; }
+.dato__meta {
+  font-size: 12px; color: var(--gris-50); text-align: right; white-space: nowrap;
+}
+
+// ── Trazabilidad ────────────────────────────────────────────────────────
+.traza {
+  margin: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px;
+
+  div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  dt { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--gris-50); }
+  dd { margin: 0; font-size: 13px; }
+  code {
+    font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--gris-70); background: var(--gris-10);
+    padding: 2px 6px; border-radius: 5px;
+    overflow-wrap: anywhere;
+  }
+}
+
+.pastilla--mini { padding: 2px 8px; font-size: 11.5px; }
+.tabla__accion { text-align: right; white-space: nowrap; }
+
 // ── Girador ─────────────────────────────────────────────────────────────
 .girador {
   width: 15px; height: 15px; flex: none;
@@ -326,6 +518,23 @@ input[type='email'], input[type='password'], input[type='text'] {
 
   .boton { min-height: 44px; }   // objetivo táctil cómodo
   .pestana { min-height: 38px; }
+
+  // La ficha pasa a hoja inferior: es donde llega el pulgar, y el visor gana
+  // todo el ancho de la pantalla en vez de perderlo en márgenes.
+  .panel { align-items: flex-end; padding: 0; }
+  .panel__caja { max-height: 94dvh; border-radius: var(--r-l) var(--r-l) 0 0; }
+  .panel__cabecera { padding: 14px 16px; }
+  .panel__cuerpo { padding: 16px 16px 24px; gap: 16px; }
+  .visor { height: 62dvh; }
+  .visor--imagen { height: auto; max-height: 62dvh; }
+
+  // Tres columnas no caben: el valor manda, la confianza baja a su propia línea.
+  .dato {
+    grid-template-columns: 1fr auto;
+    padding: 10px 0;
+  }
+  .dato__meta { grid-column: 1 / -1; text-align: left; }
+  .dato--dudoso { padding-inline: 10px; }
 
   .tabla {
     thead { display: none; }

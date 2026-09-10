@@ -109,7 +109,25 @@ export class Pipeline extends Construct {
     // Standard, no Express: el pipeline puede durar minutos, Express solo
     // soporta integraciones request-response (sin waitForTaskToken) y su
     // historial no es consultable por API.
-    const cerrar = (nombre: string, status: string, motivo: string, orig?: boolean) =>
+    /**
+     * `error: true` pasa `$.error` a la Lambda de cierre, y solo se activa en
+     * los estados a los que se llega por un `addCatch` con
+     * `resultPath: '$.error'`. Fuera de ellos ese campo no existe y la
+     * referencia rompería la ejecución **en tiempo de ejecución**, que es
+     * justo donde falla el lenguaje de estados y no el sintetizador.
+     *
+     * Sin esto, `finalize` recibía el motivo de la FASE («falló la
+     * clasificación») y nunca el código concreto («no es un PDF»). El campo
+     * `error` existía en su interfaz desde el principio: simplemente no se lo
+     * mandaba nadie. Un parámetro opcional que nunca llega es indistinguible
+     * de uno que no existe, y por eso duró tanto.
+     */
+    const cerrar = (
+      nombre: string,
+      status: string,
+      motivo: string,
+      opciones: { original?: boolean; error?: boolean } = {},
+    ) =>
       new tasks.LambdaInvoke(this, nombre, {
         lambdaFunction: finalize,
         payloadResponseOnly: true,
@@ -118,7 +136,8 @@ export class Pipeline extends Construct {
           'documentId.$': '$.documentId',
           status,
           motivo,
-          ...(orig ? { 'documentIdOriginal.$': '$.dedupe.documentIdOriginal' } : {}),
+          ...(opciones.original ? { 'documentIdOriginal.$': '$.dedupe.documentIdOriginal' } : {}),
+          ...(opciones.error ? { 'error.$': '$.error' } : {}),
         }),
       });
 
@@ -126,11 +145,11 @@ export class Pipeline extends Construct {
     // error del sistema: es un documento que no se puede procesar. Se cierra
     // como QUARANTINED y NO pasa por la DLQ. Si apareciera en la DLQ, la
     // clasificación transitorio/permanente estaría mal.
-    const enCuarentena = cerrar('Cuarentena', 'QUARANTINED', 'CLASIFICACION_FALLIDA');
+    const enCuarentena = cerrar('Cuarentena', 'QUARANTINED', 'CLASIFICACION_FALLIDA', { error: true });
     // Degradación elegante: si la extracción no sale, el documento no se pierde
     // ni la ejecución falla. Cae a revisión humana: más lento, pero correcto.
-    const aRevision = cerrar('ARevisionManual', 'NEEDS_REVIEW', 'EXTRACCION_FALLIDA');
-    const cerrarDuplicado = cerrar('CerrarDuplicado', 'DUPLICATE', 'CONTENIDO_YA_PROCESADO', true);
+    const aRevision = cerrar('ARevisionManual', 'NEEDS_REVIEW', 'EXTRACCION_FALLIDA', { error: true });
+    const cerrarDuplicado = cerrar('CerrarDuplicado', 'DUPLICATE', 'CONTENIDO_YA_PROCESADO', { original: true });
 
     const classifyTask = new tasks.LambdaInvoke(this, 'Clasificar', {
       lambdaFunction: classify,

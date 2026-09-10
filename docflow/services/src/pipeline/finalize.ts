@@ -3,6 +3,7 @@ import { Logger } from '@aws-lambda-powertools/logger';
 import { Metrics, MetricUnit } from '@aws-lambda-powertools/metrics';
 import { ddb, keys } from '../shared/ddb.js';
 import { required } from '../shared/env.js';
+import { codigoDeCausa, explicarCierre } from '../shared/explicacion.js';
 import type { DocumentStatus } from '../shared/types.js';
 
 const logger = new Logger({ serviceName: 'finalize' });
@@ -16,7 +17,15 @@ export interface FinalizeInput {
   motivo: string;
   /** Solo en DUPLICATE: el documento cuyo contenido ya se procesó. */
   documentIdOriginal?: string;
-  /** El objeto Error de Step Functions: { Error, Cause }. Solo para el log. */
+  /**
+   * El objeto de error de Step Functions: `{ Error, Cause }`.
+   *
+   * Durante un tiempo esta propiedad existía y **nunca llegaba**: la máquina de
+   * estados no la pasaba en el payload, así que el motivo que veía el cliente
+   * era siempre el genérico de la fase. El `Cause` no sale de aquí —lleva
+   * trazas de pila y nombres de recursos (I-7)—, pero el CÓDIGO que trae dentro
+   * es lo que convierte «no se pudo procesar» en «esto no es un PDF».
+   */
   error?: { Error?: string; Cause?: string };
 }
 
@@ -35,6 +44,12 @@ export interface FinalizeInput {
 export const handler = async (input: FinalizeInput): Promise<{ status: string }> => {
   const now = new Date().toISOString();
 
+  // El código concreto (MIME_DESCONOCIDO, DEMASIADAS_PAGINAS…) manda sobre el
+  // motivo de fase: «esto no es un PDF» le sirve al cliente, «falló la
+  // clasificación» no le sirve para nada.
+  const codigo = codigoDeCausa(input.error?.Cause);
+  const explicacion = explicarCierre(input.motivo, codigo);
+
   // El detalle del error va al log y al evento de auditoría, NUNCA al cliente:
   // un Cause de Step Functions lleva stack traces y nombres de recursos.
   logger.error('documento cerrado por el camino de fallo', {
@@ -42,11 +57,12 @@ export const handler = async (input: FinalizeInput): Promise<{ status: string }>
     tenantId: input.tenantId,
     status: input.status,
     motivo: input.motivo,
+    codigo,
     causa: input.error?.Cause,
   });
 
   try {
-    await escribirCierre(input, now);
+    await escribirCierre(input, now, codigo, explicacion);
   } catch (err) {
     // La condición falló: el documento YA tiene una decisión firme. No es un
     // error, es la carrera que la condición existe para ganar. Idempotente.
@@ -63,7 +79,12 @@ export const handler = async (input: FinalizeInput): Promise<{ status: string }>
   return { status: input.status };
 };
 
-async function escribirCierre(input: FinalizeInput, now: string): Promise<void> {
+async function escribirCierre(
+  input: FinalizeInput,
+  now: string,
+  codigo: string | undefined,
+  explicacion: { resumen: string; detalles: string[] },
+): Promise<void> {
   await ddb.send(
     new TransactWriteCommand({
       TransactItems: [
@@ -75,6 +96,7 @@ async function escribirCierre(input: FinalizeInput, now: string): Promise<void> 
             // pasa a ser un registro con retención de negocio.
             UpdateExpression:
               'SET #st = :st, gsi1pk = :g1pk, gsi1sk = :g1sk, motivo = :motivo,' +
+              ' motivoCodigo = :codigo, explicacion = :expl,' +
               ' documentIdOriginal = :orig, updatedAt = :now REMOVE expiresAt',
             // Solo cierra un documento que aún no tiene decisión: si una
             // ejecución tardía llegara después de la buena, no la pisa.
@@ -85,6 +107,14 @@ async function escribirCierre(input: FinalizeInput, now: string): Promise<void> 
               ':g1pk': keys.gsi1pk(input.tenantId, input.status),
               ':g1sk': keys.gsi1sk(now, input.documentId),
               ':motivo': input.motivo,
+              // null explícito por la misma razón que `documentIdOriginal`: el
+              // atributo existe siempre, así que la interfaz no distingue
+              // «sin código» de «documento anterior a esta versión».
+              ':codigo': codigo ?? null,
+              // Se persiste el TEXTO, no solo el código: dentro de seis meses
+              // el catálogo puede haber cambiado y el registro debe seguir
+              // diciendo lo que se le dijo al cliente aquel día.
+              ':expl': explicacion,
               // null explícito y no ausencia: el atributo existe siempre, así
               // que la UI no tiene que distinguir "no es duplicado" de "campo
               // que todavía no escribíamos en la versión anterior del pipeline".
@@ -102,6 +132,8 @@ async function escribirCierre(input: FinalizeInput, now: string): Promise<void> 
               tipo: 'FALLO',
               status: input.status,
               motivo: input.motivo,
+              motivoCodigo: codigo ?? null,
+              explicacion: explicacion.resumen,
               errorTipo: input.error?.Error,
               at: now,
             },

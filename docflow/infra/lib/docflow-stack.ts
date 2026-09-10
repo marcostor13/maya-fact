@@ -79,7 +79,9 @@ export class DocFlowStack extends Stack {
     // bloquea el POST a S3 porque el único origen permitido era localhost. Es
     // un fallo que no aparece en desarrollo y solo se ve en producción.
     storage.uploads.addCorsRule({
-      allowedMethods: [s3.HttpMethods.POST],
+      // POST para subir, GET para que el visor lea el documento original con el
+      // enlace firmado que emite GET /documents/{id}/content.
+      allowedMethods: [s3.HttpMethods.POST, s3.HttpMethods.GET],
       allowedOrigins: [`https://${web.distribution.distributionDomainName}`],
       allowedHeaders: ['*'],
       maxAge: 3000,

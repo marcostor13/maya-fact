@@ -3,6 +3,7 @@ import { Logger } from '@aws-lambda-powertools/logger';
 import { Metrics, MetricUnit } from '@aws-lambda-powertools/metrics';
 import { ddb, keys } from '../shared/ddb.js';
 import { required } from '../shared/env.js';
+import { explicarDecision } from '../shared/explicacion.js';
 import { evaluar } from './rules-engine.js';
 import { reconciliarImportes } from './reconciliar.js';
 import type { Decision, ExtractionResult, RuleSet } from '../shared/types.js';
@@ -44,6 +45,10 @@ export const handler = async (input: DecideInput): Promise<Decision> => {
   const decision = evaluar(extraccion, ruleSet);
   if (ajustes.length) logger.info('importes reconciliados', { documentId: input.documentId, ajustes });
 
+  // La frase que va a leer la persona, construida aquí y guardada con la
+  // decisión. Los `hits` siguen estando: esto no los sustituye, los resume.
+  const explicacion = explicarDecision(decision, ajustes);
+
   const now = new Date().toISOString();
 
   // Una sola transacción: el documento, sus campos y el evento de auditoría
@@ -61,6 +66,7 @@ export const handler = async (input: DecideInput): Promise<Decision> => {
         UpdateExpression:
           'SET #st = :st, gsi1pk = :g1pk, gsi1sk = :g1sk, #rt = :rt, pageCount = :pc, sha256 = :sha,' +
           ' hits = :hits, camposBajoUmbral = :cbu, lineas = :lineas, ajustes = :ajustes,' +
+          ' explicacion = :expl, motivo = :motivo, motivoCodigo = :codigo,' +
           ' modelId = :model, promptVersion = :pv, rulesetVersion = :rv,' +
           ' inputTokens = :ti, outputTokens = :to, updatedAt = :now' +
           ' REMOVE expiresAt',
@@ -76,6 +82,13 @@ export const handler = async (input: DecideInput): Promise<Decision> => {
           ':cbu': decision.camposBajoUmbral,
           ':lineas': extraccion.lineas ?? [],
           ':ajustes': ajustes,
+          ':expl': explicacion,
+          // Un documento que llegó hasta aquí no se cerró por el camino de
+          // fallo. Se escriben en null y no se omiten para que el ítem tenga
+          // siempre la misma forma: la interfaz no debe distinguir «no aplica»
+          // de «lo escribió una versión anterior del pipeline».
+          ':motivo': null,
+          ':codigo': null,
           // El trío que hace auditable cualquier decisión, para siempre.
           ':model': input.extraction.modelId,
           ':pv': input.extraction.promptVersion,
@@ -95,6 +108,7 @@ export const handler = async (input: DecideInput): Promise<Decision> => {
           tipo: 'DECISION',
           status: decision.status,
           hits: decision.hits,
+          explicacion: explicacion.resumen,
           rulesetVersion: decision.rulesetVersion,
           at: now,
         },

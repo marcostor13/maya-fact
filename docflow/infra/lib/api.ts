@@ -30,6 +30,10 @@ export class Api extends Construct {
     const createUpload = fn(this, 'CreateUpload', { entry: src('create-upload.ts'), environment: env });
     const getDocument = fn(this, 'GetDocument', { entry: src('get-document.ts'), environment: env });
     const listDocuments = fn(this, 'ListDocuments', { entry: src('list-documents.ts'), environment: env });
+    // Firma el enlace de lectura del documento original. Función aparte y no un
+    // parámetro de GetDocument: es la única de las cuatro que necesita tocar S3,
+    // y meterla dentro le daría ese permiso también a la que lee metadatos.
+    const getContent = fn(this, 'GetContent', { entry: src('get-content.ts'), environment: env });
 
     // ---- IAM de grano fino --------------------------------------------------
     // No usamos table.grantReadData(): concede dynamodb:Query y GetItem sobre
@@ -63,6 +67,18 @@ export class Api extends Construct {
     );
     listDocuments.addToRolePolicy(
       tenantScoped(['dynamodb:Query'], [`${props.table.tableArn}/index/GSI1`]),
+    );
+    getContent.addToRolePolicy(tenantScoped(['dynamodb:GetItem'], [props.table.tableArn]));
+
+    // El emisor del enlace de lectura SÍ necesita s3:GetObject: una URL firmada
+    // solo vale para lo que su firmante podría hacer por sí mismo. Acotado al
+    // prefijo de entrada y a nada más — ni al bucket web, ni a otros prefijos
+    // que este bucket pueda tener mañana.
+    getContent.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:GetObject'],
+        resources: [props.uploads.arnForObjects('tenants/*/inbox/*')],
+      }),
     );
 
     // El emisor del presigned NO necesita s3:PutObject: firma, no escribe.
@@ -111,6 +127,11 @@ export class Api extends Construct {
       path: '/documents/{documentId}',
       methods: [apigw.HttpMethod.GET],
       integration: new HttpLambdaIntegration('GetDocumentInt', getDocument),
+    });
+    this.httpApi.addRoutes({
+      path: '/documents/{documentId}/content',
+      methods: [apigw.HttpMethod.GET],
+      integration: new HttpLambdaIntegration('GetContentInt', getContent),
     });
   }
 }

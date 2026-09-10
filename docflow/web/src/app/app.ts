@@ -1,8 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from './auth.service';
-import { DocumentsService } from './documents.service';
+import { DocumentsService, type Contenido } from './documents.service';
 import { ETIQUETA_ESTADO, ICONO_POR_ESTADO, Icono, type NombreIcono } from './icon';
 
 interface Doc {
@@ -12,6 +12,65 @@ interface Doc {
   route?: string;
   updatedAt?: string;
 }
+
+/** La frase y las razones que escribió el pipeline, no el frontend. */
+interface Explicacion {
+  resumen: string;
+  detalles: string[];
+}
+
+interface Hit {
+  id: string;
+  severidad: string;
+  mensaje: string;
+}
+
+interface Campo {
+  nombre: string;
+  value: string | null;
+  normalized: string | number | null;
+  confidence: number;
+  source: string;
+  quote?: string;
+}
+
+interface DocumentoCompleto extends Doc {
+  contentType?: string;
+  explicacion?: Explicacion;
+  hits?: Hit[];
+  camposBajoUmbral?: string[];
+  ajustes?: string[];
+  documentIdOriginal?: string | null;
+  modelId?: string;
+  promptVersion?: string;
+  rulesetVersion?: string;
+}
+
+interface Detalle {
+  document: DocumentoCompleto;
+  fields: Campo[];
+  original: { documentId: string; fileName?: string; status?: string } | null;
+}
+
+/** Importes que el esquema normaliza a la unidad menor de la moneda. */
+const CAMPOS_IMPORTE = new Set(['subtotal', 'impuesto', 'total']);
+
+const ETIQUETA_CAMPO: Record<string, string> = {
+  proveedor_nombre: 'Proveedor',
+  proveedor_id_fiscal: 'Identificador fiscal',
+  numero_documento: 'Nº de documento',
+  fecha_emision: 'Fecha de emisión',
+  moneda: 'Moneda',
+  subtotal: 'Base imponible',
+  impuesto: 'Impuesto',
+  total: 'Total',
+};
+
+const ETIQUETA_PROCEDENCIA: Record<string, string> = {
+  ocr_geometry: 'leído con OCR',
+  llm_inference: 'leído por el modelo',
+  rule_derived: 'deducido por una regla',
+};
 
 const TERMINALES = ['APPROVED', 'NEEDS_REVIEW', 'REJECTED', 'DUPLICATE', 'QUARANTINED'];
 
@@ -29,6 +88,10 @@ const FILTROS = [
   imports: [FormsModule, Icono],
   templateUrl: './app.html',
   styleUrl: './app.scss',
+  // Escape cierra la ficha. Es lo que hace todo el mundo sin pensarlo, y una
+  // ventana que solo se cierra con el ratón es una ventana que atrapa a quien
+  // navega con teclado.
+  host: { '(document:keydown.escape)': 'cerrarDetalle()' },
 })
 export class App {
   private auth = inject(AuthService);
@@ -54,12 +117,52 @@ export class App {
   documentos = signal<Doc[]>([]);
   filtro = signal<string>('APPROVED');
 
+  // ---- Detalle y visor ---------------------------------------------------
+  detalle = signal<Detalle | null>(null);
+  cargandoDetalle = signal(false);
+  visor = signal<Contenido | null>(null);
+  cargandoVisor = signal(false);
+  errorVisor = signal('');
+
+  /**
+   * El `<iframe>` del visor de PDF.
+   *
+   * La referencia existe porque su `src` se asigna a mano, y eso NO es un
+   * atajo: en Angular, `iframe[src]` es un contexto `RESOURCE_URL` y una
+   * interpolación normal exigiría `bypassSecurityTrustResourceUrl`, que este
+   * repositorio prohíbe (CLAUDE.md I-6) y la auditoría bloquea. Y la prohíbe
+   * con razón: abrir esa puerta «solo para el visor» es exactamente como se
+   * acaba confiando en una URL que sí venía de un documento.
+   *
+   * Asignar la propiedad del DOM directamente no la abre: aquí la URL es un
+   * `blob:` que ha creado esta misma pestaña, con un tipo de una lista blanca.
+   * No hay nada de terceros en ese valor.
+   */
+  private marco = viewChild<ElementRef<HTMLIFrameElement>>('marco');
+
   /** El texto del filtro activo, para el encabezado de la lista. */
   filtroTexto = computed(
     () => FILTROS.find((f) => f.valor === this.filtro())?.texto ?? '',
   );
 
+  tipoVisor = computed<'pdf' | 'imagen' | 'sin-vista-previa' | null>(() => {
+    const tipo = this.visor()?.contentType;
+    if (!tipo) return null;
+    if (tipo === 'application/pdf') return 'pdf';
+    if (tipo === 'image/jpeg' || tipo === 'image/png') return 'imagen';
+    // TIFF entra por la puerta de subida y ningún navegador lo pinta. Decirlo y
+    // ofrecer la descarga es mejor que un recuadro en blanco que parece un bug.
+    return 'sin-vista-previa';
+  });
+
   constructor() {
+    effect(() => {
+      const marco = this.marco();
+      const contenido = this.visor();
+      if (marco && contenido && this.tipoVisor() === 'pdf') {
+        marco.nativeElement.src = contenido.url;
+      }
+    });
     void this.restaurarSesion();
   }
 
@@ -118,6 +221,9 @@ export class App {
     this.documentos.set([]);
     this.progreso.set('');
     this.ultimoEstado.set('');
+    // Cerrar sesión tiene que llevarse también el documento que hubiera en
+    // pantalla: el `blob:` sigue vivo en memoria aunque el token ya no valga.
+    this.cerrarDetalle();
   }
 
   // ---- Subida ------------------------------------------------------------
@@ -196,7 +302,128 @@ export class App {
 
   async cambiarFiltro(valor: string): Promise<void> {
     this.filtro.set(valor);
+    this.cerrarDetalle();
     await this.listar();
+  }
+
+  // ---- Detalle -----------------------------------------------------------
+  /**
+   * Abre la ficha de un documento: por qué acabó como acabó, qué se extrajo y
+   * el original para poder mirarlo.
+   *
+   * El visor NO se carga aquí. Ver el porqué es barato —ya está en DynamoDB—
+   * y ver el documento cuesta una descarga: separarlos evita traerse veinte
+   * megas cada vez que alguien solo quería leer el motivo del rechazo.
+   */
+  async abrirDetalle(documentId: string): Promise<void> {
+    this.cerrarVisor();
+    this.detalle.set(null);
+    this.cargandoDetalle.set(true);
+    try {
+      const res = await firstValueFrom(this.docs.obtener(documentId));
+      this.detalle.set({
+        document: res.document as unknown as DocumentoCompleto,
+        fields: this.ordenarCampos(res.fields as Campo[]),
+        original: res.original as Detalle['original'],
+      });
+    } catch (e) {
+      this.error.set('No se pudo abrir el documento.');
+      console.error(e);
+    } finally {
+      this.cargandoDetalle.set(false);
+    }
+  }
+
+  cerrarDetalle(): void {
+    this.cerrarVisor();
+    this.detalle.set(null);
+  }
+
+  /** Del duplicado a su original, sin salir de la ficha. */
+  async irAlOriginal(documentId: string): Promise<void> {
+    await this.abrirDetalle(documentId);
+  }
+
+  /** El orden del esquema, no el alfabético de DynamoDB: se lee como la factura. */
+  private ordenarCampos(campos: Campo[]): Campo[] {
+    const orden = Object.keys(ETIQUETA_CAMPO);
+    return [...(campos ?? [])].sort(
+      (a, b) => indiceDe(orden, a.nombre) - indiceDe(orden, b.nombre),
+    );
+  }
+
+  etiquetaCampo(nombre: string): string {
+    return ETIQUETA_CAMPO[nombre] ?? nombre;
+  }
+
+  procedencia(source: string): string {
+    return ETIQUETA_PROCEDENCIA[source] ?? source;
+  }
+
+  /**
+   * Los importes se guardan como enteros en la unidad menor de la moneda
+   * (CLAUDE.md §2.2: nunca `float` para dinero). Aquí es donde se vuelven a
+   * dividir, en el último momento y solo para enseñarlos.
+   */
+  valorCampo(campo: Campo, moneda: string): string {
+    if (campo.normalized === null || campo.normalized === undefined) return '—';
+    if (CAMPOS_IMPORTE.has(campo.nombre) && typeof campo.normalized === 'number') {
+      const cantidad = (campo.normalized / 100).toLocaleString('es', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      return moneda ? `${cantidad} ${moneda}` : cantidad;
+    }
+    return String(campo.normalized);
+  }
+
+  monedaDe(campos: Campo[]): string {
+    const m = campos.find((c) => c.nombre === 'moneda')?.normalized;
+    return typeof m === 'string' ? m : '';
+  }
+
+  porcentaje(confianza: number): string {
+    return `${Math.round((confianza ?? 0) * 100)}%`;
+  }
+
+  esDudoso(campo: Campo): boolean {
+    return (this.detalle()?.document.camposBajoUmbral ?? []).includes(campo.nombre);
+  }
+
+  // ---- Visor -------------------------------------------------------------
+  /**
+   * Trae el documento original y lo deja listo para pintar.
+   *
+   * Se pide bajo demanda y con un enlace de dos minutos: la URL firmada no se
+   * cachea, no se guarda y no llega al DOM. Volver a pulsar «ver» pide otra.
+   */
+  async verDocumento(): Promise<void> {
+    const documentId = this.detalle()?.document.documentId;
+    if (!documentId || this.cargandoVisor()) return;
+
+    this.cerrarVisor();
+    this.cargandoVisor.set(true);
+    this.errorVisor.set('');
+    try {
+      this.visor.set(await this.docs.contenido(documentId));
+    } catch (e) {
+      this.errorVisor.set('No se pudo cargar el documento original.');
+      console.error(e);
+    } finally {
+      this.cargandoVisor.set(false);
+    }
+  }
+
+  /**
+   * Un `blob:` vive hasta que alguien lo libera o hasta que se cierra la
+   * pestaña. Sin esto, abrir veinte documentos deja veinte copias en memoria:
+   * la clase de fuga que no rompe nada y solo se nota en una sesión larga.
+   */
+  cerrarVisor(): void {
+    const abierto = this.visor();
+    if (abierto) URL.revokeObjectURL(abierto.url);
+    this.visor.set(null);
+    this.errorVisor.set('');
   }
 
   nombreCorto(d: Doc): string {
@@ -210,4 +437,10 @@ export class App {
       ? '—'
       : d.toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
+}
+
+/** Lo que no está en el orden conocido va al final, no al principio. */
+function indiceDe(orden: string[], nombre: string): number {
+  const i = orden.indexOf(nombre);
+  return i === -1 ? orden.length : i;
 }

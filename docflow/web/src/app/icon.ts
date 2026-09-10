@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 export type NombreIcono =
   | 'subir' | 'aprobado' | 'revision' | 'rechazado' | 'duplicado' | 'cuarentena'
   | 'pendiente' | 'salir' | 'documento' | 'escudo' | 'candado' | 'refrescar'
-  | 'ojo' | 'ojo-tachado';
+  | 'ojo' | 'ojo-tachado' | 'cerrar' | 'descargar' | 'enlace' | 'info';
 
 /**
  * Iconos en SVG en línea, dentro de la plantilla.
@@ -89,6 +89,21 @@ export type NombreIcono =
           <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
           <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+        }
+        @case ('cerrar') {
+          <path d="M18 6L6 18" /><path d="M6 6l12 12" />
+        }
+        @case ('descargar') {
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <path d="M7 10l5 5 5-5" /><path d="M12 15V3" />
+        }
+        @case ('enlace') {
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        }
+        @case ('info') {
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4" /><path d="M12 8h.01" />
         }
       }
     </svg>

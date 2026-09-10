@@ -60,9 +60,23 @@ export class Web extends Construct {
             "script-src 'self'",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob:",
-            // El navegador sube DIRECTO a S3 con el presigned POST, y habla con
-            // Cognito para autenticarse. Nada más sale de esta página.
+            // El navegador sube DIRECTO a S3 con el presigned POST, descarga el
+            // documento original con el enlace firmado, y habla con Cognito para
+            // autenticarse. Nada más sale de esta página.
             `connect-src 'self' ${s3Host} ${cognitoHost}`,
+            // El visor pinta el PDF en un iframe que apunta a un `blob:` creado
+            // en la propia página, NO a S3. Dos cosas a la vez: la URL firmada
+            // no acaba en el DOM, y el tipo del blob lo fija nuestro código
+            // —de una lista blanca— en vez de heredarlo de lo que devuelva S3.
+            //
+            // `blob:` hay que declararlo: `frame-src` hereda de `default-src`,
+            // que es `'self'`, y un blob NO es 'self'. Sin esta línea el visor
+            // se queda en blanco solo en producción, porque en desarrollo no
+            // hay CSP — el peor sitio donde descubrir una directiva que falta.
+            "frame-src 'self' blob:",
+            // Nada de <object> ni <embed>: son la otra puerta para incrustar
+            // contenido activo, y el visor no las necesita.
+            "object-src 'none'",
             "frame-ancestors 'none'",
             "base-uri 'self'",
             // form-action hacia S3 no es un descuido: el presigned POST es

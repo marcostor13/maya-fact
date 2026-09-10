@@ -65,7 +65,18 @@ for i in $(seq 1 60); do
   # sondeando 5 minutos un documento que ya habia terminado — y confundia un
   # ahorro con un cuelgue.
   case "$S" in APPROVED|NEEDS_REVIEW|REJECTED|DUPLICATE|QUARANTINED)
-    echo; echo "$R" | jq '{status: .document.status, ruta: .document.route, reglas: .document.hits, modelo: .document.modelId, ruleset: .document.rulesetVersion}'; exit 0;;
+    # `porque` es lo primero que se imprime a proposito: es la unica linea que
+    # se entiende sin conocer el sistema, y es la misma frase que ve el cliente
+    # en la interfaz — se calcula y se guarda en el pipeline, no en el frontend.
+    echo; echo "$R" | jq '{
+      status: .document.status,
+      porque: .document.explicacion.resumen,
+      detalles: .document.explicacion.detalles,
+      ruta: .document.route,
+      reglas: .document.hits,
+      modelo: .document.modelId,
+      ruleset: .document.rulesetVersion
+    }'; exit 0;;
   esac
   sleep 5
 done

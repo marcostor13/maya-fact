@@ -22,8 +22,14 @@ export class Storage extends Construct {
       eventBridgeEnabled: true,
       cors: [
         {
-          // Solo lo que el presigned POST necesita desde el navegador.
-          allowedMethods: [s3.HttpMethods.POST],
+          // POST para el presigned de subida; GET para que el visor pueda
+          // descargar el documento con el enlace firmado.
+          //
+          // Ojo con el GET: sin él, la subida sigue funcionando y solo falla el
+          // visor, con un error de CORS que el navegador reporta como fallo de
+          // red. El síntoma —«no carga el documento»— manda a mirar el enlace
+          // firmado, que está perfectamente.
+          allowedMethods: [s3.HttpMethods.POST, s3.HttpMethods.GET],
           allowedOrigins: props.allowedOrigins,
           allowedHeaders: ['*'],
           maxAge: 3000,

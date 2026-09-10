@@ -82,9 +82,14 @@ EOF
 
 # Angular limita cada hoja de componente a 8 kB y falla la compilacion al
 # pasarse. El presupuesto existe para que nadie meta un framework CSS entero en
-# un componente, y es buena idea; pero 12 kB para la UNICA hoja de estilos de la
-# aplicacion es razonable. Se sube el limite a proposito, no se desactiva: si un
-# dia esta hoja llega a 12 kB, quiero que la compilacion vuelva a avisar.
+# un componente, y es buena idea; pero esta es la UNICA hoja de estilos de la
+# aplicacion, asi que el limite se sube a proposito, no se desactiva.
+#
+# Y ya avisto una vez: al aniadir la ficha de documento —el motivo, el visor y
+# los datos extraidos— la hoja paso de 11 a 15 kB y la compilacion FALLO. Eso es
+# exactamente lo que se le pedia. Se revisa que el crecimiento tenga razon de
+# ser, se sube el techo con margen y se deja el guard vivo: un presupuesto que
+# se desactiva la primera vez que molesta no era un presupuesto.
 node -e '
 const fs = require("fs");
 const ruta = process.argv[1];
@@ -92,7 +97,7 @@ const j = JSON.parse(fs.readFileSync(ruta, "utf8"));
 const b = j.projects[Object.keys(j.projects)[0]].architect.build;
 b.configurations.production.budgets = [
   { type: "initial", maximumWarning: "700kB", maximumError: "1MB" },
-  { type: "anyComponentStyle", maximumWarning: "10kB", maximumError: "12kB" },
+  { type: "anyComponentStyle", maximumWarning: "16kB", maximumError: "20kB" },
 ];
 
 // inlineCritical: false — y esto NO es una preferencia de rendimiento.

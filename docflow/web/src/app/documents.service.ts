@@ -7,6 +7,14 @@ export interface PresignedPost {
   fields: Record<string, string>;
 }
 
+/** Un documento listo para pintar: el blob ya descargado, no el enlace firmado. */
+export interface Contenido {
+  /** `blob:` local. Hay que liberarlo con `URL.revokeObjectURL` al cerrarlo. */
+  url: string;
+  contentType: string;
+  fileName: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class DocumentsService {
   private http = inject(HttpClient);
@@ -44,8 +52,43 @@ export class DocumentsService {
   }
 
   obtener(documentId: string) {
-    return this.http.get<{ document: Record<string, unknown>; fields: unknown[] }>(
-      `${this.base}/documents/${documentId}`,
+    return this.http.get<{
+      document: Record<string, unknown>;
+      fields: unknown[];
+      original: Record<string, unknown> | null;
+    }>(`${this.base}/documents/${documentId}`);
+  }
+
+  /**
+   * Descarga el documento original y lo deja como `blob:` listo para pintar.
+   *
+   * Son dos saltos, igual que la subida y por los mismos motivos invertidos:
+   * nuestra API **firma** un enlace de dos minutos, y el navegador va a S3 a por
+   * los bytes. El backend nunca mueve el fichero.
+   *
+   * Y tres decisiones dentro de estas pocas líneas:
+   *
+   * 1. **`fetch` y no `HttpClient`.** El interceptor solo añade el token a las
+   *    llamadas a `/api`, pero usar `fetch` lo deja fuera de toda duda: mandar
+   *    la cabecera `Authorization` a S3 rompería la firma *y* filtraría el token
+   *    a otro host.
+   * 2. **El tipo del blob es el que dijo NUESTRA API**, no el que devuelva S3.
+   *    Un fichero disfrazado no puede acabar interpretado como HTML por mucho
+   *    que el objeto almacenado diga otra cosa.
+   * 3. **El enlace firmado no se guarda ni se pinta.** Vive lo que dura esta
+   *    función; lo que llega a la interfaz es un `blob:` de esta pestaña.
+   */
+  async contenido(documentId: string): Promise<Contenido> {
+    const meta = await firstValueFrom(
+      this.http.get<{ url: string; contentType: string; fileName: string }>(
+        `${this.base}/documents/${documentId}/content`,
+      ),
     );
+
+    const res = await fetch(meta.url);
+    if (!res.ok) throw new Error(`El almacenamiento rechazó la lectura: ${res.status}`);
+
+    const blob = new Blob([await res.arrayBuffer()], { type: meta.contentType });
+    return { url: URL.createObjectURL(blob), contentType: meta.contentType, fileName: meta.fileName };
   }
 }

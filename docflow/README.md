@@ -83,7 +83,7 @@ EMAIL=tu@email.com PASSWORD='Docflow-Prueba-2026!' ./scripts/smoke.sh factura.pd
 ```
 
 Esto no es una promesa: es una propiedad **verificada sobre la plantilla
-sintetizada**. De los 103 recursos del stack, **0 tienen `DeletionPolicy: Retain`**,
+sintetizada**. De los 110 recursos del stack, **0 tienen `DeletionPolicy: Retain`**,
 y los 3 buckets se auto-vacían antes de borrarse (S3 no permite eliminar un
 bucket con objetos dentro, versiones antiguas incluidas).
 
@@ -122,7 +122,7 @@ pasado la verificación.
 | Job `verificar` | Qué comprueba |
 |---|---|
 | Tipos de `services` e `infra` | `tsc --noEmit` |
-| **15 tests del motor de reglas** | Deterministas, sin AWS ni modelo: **coste cero por ejecución** |
+| **35 tests de reglas, reconciliación y motivos** | Deterministas, sin AWS ni modelo: **coste cero por ejecución** |
 | `cdk synth` | Compilar la infraestructura antes de tocar la cuenta |
 | **Todo el stack es eliminable** | Falla si alguien añade un recurso con `DeletionPolicy: Retain` |
 | **El tenant no viaja en el request** | `grep` sobre `services/src`, excluyendo comentarios |
@@ -194,7 +194,7 @@ rompió, que es el fallo más fácil de introducir en esta arquitectura.
 
 ## Estado de verificación
 
-- `cdk synth` limpio: **103 recursos**, sin estados inalcanzables en la máquina
+- `cdk synth` limpio: **110 recursos**, sin estados inalcanzables en la máquina
   de pasos (21 estados, verificado sobre la plantilla sintetizada).
 - `tsc --noEmit` sin errores en `infra` y `services`.
 - **La región es una decisión, no una variable de entorno.** Se fija en
@@ -210,7 +210,7 @@ No es una estimación: se desplegó en `us-east-1` y se ejecutó contra servicio
 
 | Prueba | Resultado |
 |---|---|
-| Despliegue completo | ✅ 103 recursos, 5 min |
+| Despliegue completo | ✅ 103 recursos, 5 min *(110 tras añadir el visor)* |
 | Claim `tenant_id` en el access token | ✅ `{"tenant_id":"acme","roles":"reviewer"}` |
 | Subida directa a S3 con presigned POST | ✅ HTTP 204 |
 | **Factura válida → decisión** | ✅ **`APPROVED` en 35 s**, ruta `R1_PDF_TEXT` (sin OCR) |

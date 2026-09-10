@@ -19,7 +19,7 @@ tiene. Estos son los que faltan, con su razón:
 | ~~OIDC entre CI y AWS~~ | OWASP A08 | ✅ **Implementado**: `infra/lib/cicd.ts` + `.github/workflows/ci-cd.yml` |
 | **SBOM y escaneo de dependencias** | OWASP A06 | Sigue pendiente. El pipeline ya existe, así que ahora es añadir un paso |
 | **Inferencia por lotes al 50%** | `costos.md`, palanca 5 | Exige separar cola urgente de diferida: es una rama de arquitectura, no un flag |
-| **Descarga del documento original** | Implícita en la UI de revisión | El endpoint no existe. Cuando exista: presigned de vida corta y verificación de pertenencia **antes** de emitirla |
+| ~~**Descarga del documento original**~~ | Implícita en la UI de revisión | ✅ **Implementado**: `GET /documents/{id}/content` (`services/src/api/get-content.ts`). Presigned de **120 segundos**, pertenencia verificada leyendo el ítem de la partición del tenant **antes** de firmar, `Content-Type` forzado desde una lista blanca y su prueba añadida a `probar-aislamiento.sh` |
 | **Notificación por SNS / webhooks** | `diagrama-contexto.md` | La UI hace polling. El fan-out por EventBridge está preparado, no cableado |
 
 ## 2. Deudas técnicas dentro del código
@@ -44,6 +44,18 @@ partición— sigue siendo la que aísla de verdad.
 **La re-extracción de R3 se paga dos veces.** Deliberado: solo ocurre en el ~5%
 que va a revisión. Pero es un coste que un diseño con clasificación perfecta de
 entrada no tendría.
+
+**El visor descarga el documento entero en memoria del navegador.** Hasta 20 MB.
+Se hace así a propósito —el `blob:` mantiene la URL firmada fuera del DOM y deja
+que el tipo lo fije nuestra lista blanca en vez de heredarlo de S3— pero en un
+móvil con un escaneo grande se nota. La alternativa es apuntar el `iframe`
+directamente a la URL firmada: más rápido y con dos propiedades menos.
+
+**El visor no pinta los `bbox` que compra la ruta R3.** Los campos que pasaron
+por Textract traen coordenadas y confianza calibrada, y la ficha las guarda
+pero no las dibuja sobre el documento. Es exactamente el resaltado que justifica
+comprar OCR (ADR-011), así que mientras no exista, la ruta R3 está pagando por
+algo que solo se usa a medias: la confianza calibrada sí, la geometría no.
 
 **El anclaje de geometría depende de la cita literal.** Si el modelo parafrasea,
 el campo no ancla y queda como `llm_inference`. Es la respuesta correcta —**la
@@ -72,6 +84,14 @@ cola está vacía, no hay error, y el TTL lo borra a las 24 h. Silenciosamente.
 Haría falta un chequeo periódico de `PENDING` más viejos que el SLO. Es el hueco
 que más me molesta porque es exactamente la clase de fallo que este repositorio
 ya tuvo una vez.
+
+**Ver un documento no deja rastro en la auditoría del documento.** Emitir un
+enlace firmado *es* un acceso a datos con PII, y hoy solo queda en el log de la
+Lambda, con su retención de un mes. Debería escribir un evento `DOC#…#EVT#…` de
+tipo `LECTURA` con el usuario y la marca de tiempo, que es lo que permite
+responder «¿quién vio esta factura?» — la pregunta que llega el día de una
+reclamación, no antes. Es la deuda que este cambio ha creado, y la más barata
+de cerrar de toda la lista.
 
 **El eslabón navegador → API no está instrumentado.** Identificado, no cerrado.
 
@@ -116,7 +136,9 @@ métricas se emiten; las alarmas sobre exactitud contra el conjunto dorado, no.
 
 6. **Conjunto dorado a 100 casos** con documentos reales.
 7. **Bedrock Guardrails** y captura de las correcciones humanas como etiquetas.
-8. **Endpoint de descarga** con presigned de vida corta.
+8. ~~**Endpoint de descarga** con presigned de vida corta.~~ ✅ Hecho, junto con
+   la ficha que explica **por qué** un documento acabó rechazado, duplicado o en
+   cuarentena. Lo que queda abierto está justo debajo.
 9. **Sustituir la heurística de PDF** por una librería, con SBOM ya montado.
 10. **Ensayar el redespliegue en otra región**, cronometrado, para convertir el RTO de 4 h de estimación en medición.
 
